@@ -1,0 +1,45 @@
+﻿{% extends "base.html" %}
+{% block title %}分类管理{% endblock %}
+{% block content %}
+<div class="admin-container">
+    <div class="admin-header">
+        <h2>🏷️ 分类管理</h2>
+        <form method="post" class="inline-form">
+            {% csrf_token %}
+            <input type="text" name="name" placeholder="新分类名称" required>
+            <button type="submit" class="btn btn-success">添加</button>
+        </form>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr><th>ID</th><th>分类名称</th><th>图书数量</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+            {% for cat in categories %}
+            <tr>
+                <td>{{ cat.id }}</td>
+                <td>
+                    <form method="post" action="{% url 'admin_category_edit' cat.id %}" class="inline-form" id="edit-form-{{ cat.id }}">
+                        {% csrf_token %}
+                        <input type="text" name="name" value="{{ cat.name }}" class="inline-edit">
+                    </form>
+                </td>
+                <td>{{ cat.book_count }}</td>
+                <td class="action-cell">
+                    <button type="submit" form="edit-form-{{ cat.id }}" class="btn btn-sm btn-primary">保存</button>
+                    {% if cat.book_count == 0 %}
+                    <form method="post" action="{% url 'admin_category_delete' cat.id %}" style="display:inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确认删除分类「{{ cat.name }}」？')">删除</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="empty-cell">暂无分类</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

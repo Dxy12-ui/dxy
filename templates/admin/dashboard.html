@@ -1,0 +1,119 @@
+﻿{% extends "base.html" %}
+{% block title %}管理员仪表盘{% endblock %}
+{% block content %}
+<div class="admin-dashboard">
+    <h2>📊 管理员工作台</h2>
+    
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_books }}</div>
+            <div class="stat-label">馆藏图书</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ total_students }}</div>
+            <div class="stat-label">注册学生</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ total_borrows }}</div>
+            <div class="stat-label">总借阅量</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ active_borrows }}</div>
+            <div class="stat-label">借阅中</div>
+        </div>
+    </div>
+
+    <!-- 热门图书 -->
+    <div class="dashboard-section">
+        <h3>🔥 热门图书 Top 10</h3>
+        {% if hot_books %}
+        <table class="data-table">
+            <thead>
+                <tr><th>排名</th><th>书名</th><th>作者</th><th>借阅次数</th></tr>
+            </thead>
+            <tbody>
+                {% for book in hot_books %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ book.title }}</td>
+                    <td>{{ book.author }}</td>
+                    <td>{{ book.borrow_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>暂无借阅数据</p>
+        {% endif %}
+    </div>
+
+    <!-- 库存预警 -->
+    <div class="dashboard-section">
+        <h3>⚠️ 库存预警（库存 ≤ 3）</h3>
+        {% if low_stock %}
+        <table class="data-table">
+            <thead>
+                <tr><th>书名</th><th>作者</th><th>当前库存</th><th>总库存</th></tr>
+            </thead>
+            <tbody>
+                {% for book in low_stock %}
+                <tr {% if book.stock <= 0 %}class="danger"{% endif %}>
+                    <td>{{ book.title }}</td>
+                    <td>{{ book.author }}</td>
+                    <td>{{ book.stock }}</td>
+                    <td>{{ book.total_num }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>✅ 所有图书库存充足</p>
+        {% endif %}
+    </div>
+
+    <!-- 月度趋势 -->
+    <div class="dashboard-section">
+        <h3>📈 借阅趋势（近6个月）</h3>
+        <div class="chart-container">
+            <canvas id="trendChart" width="100%" height="300"></canvas>
+        </div>
+    </div>
+
+    <div class="dashboard-actions">
+        <a href="{% url 'admin_book_list' %}" class="btn btn-primary">管理图书</a>
+        <a href="{% url 'admin_borrow_records' %}" class="btn btn-primary">借阅记录</a>
+        <a href="{% url 'admin_statistics' %}" class="btn btn-primary">详细统计</a>
+        <a href="{% url 'admin_user_list' %}" class="btn btn-primary">用户管理</a>
+        <a href="{% url 'admin_category_list' %}" class="btn btn-primary">分类管理</a>
+    </div>
+</div>
+
+<script src="/static/js/chart.js"></script>
+<script>
+// 月度趋势图
+{% if monthly_data %}
+(function() {
+    var ctx = document.getElementById("trendChart").getContext("2d");
+    new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: [{% for item in monthly_data %}"{{ item.month }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                label: "借阅量",
+                data: [{% for item in monthly_data %}{{ item.count }}{% if not forloop.last %},{% endif %}{% endfor %}],
+                backgroundColor: "#4a90d9",
+            }]
+        },
+        options: {
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+})();
+{% endif %}
+</script>
+
+{% endblock %}
+

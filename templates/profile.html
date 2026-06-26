@@ -1,0 +1,16 @@
+﻿{% extends "base.html" %}
+{% block title %}个人信息{% endblock %}
+{% block content %}
+<div class="profile-container">
+    <h2>个人信息</h2>
+    <div class="profile-card">
+        <table class="info-table">
+            <tr><th>用户名</th><td>{{ user.username }}</td></tr>
+            <tr><th>角色</th><td>{{ user.get_role_display }}</td></tr>
+            <tr><th>注册时间</th><td>{{ user.create_time|date:"Y-m-d H:i" }}</td></tr>
+            <tr><th>邮箱</th><td>{{ user.email|default:"未设置" }}</td></tr>
+        </table>
+    </div>
+    <a href="/" class="btn btn-secondary">返回首页</a>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}校园图书管理系统{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">📚 校园图书管理系统</a>
+            {% if user.is_authenticated %}
+            <div class="nav-links">
+                {% if user.role == "admin" %}
+                    <a href="{% url 'admin_dashboard' %}" class="nav-link">仪表盘</a>
+                    <a href="{% url 'admin_book_list' %}" class="nav-link">图书管理</a>
+                    <a href="{% url 'admin_category_list' %}" class="nav-link">分类管理</a>
+                    <a href="{% url 'admin_borrow_records' %}" class="nav-link">借阅记录</a>
+                    <a href="{% url 'admin_statistics' %}" class="nav-link">数据统计</a>
+                    <a href="{% url 'admin_user_list' %}" class="nav-link">用户管理</a>
+                {% else %}
+                    <a href="/" class="nav-link">图书浏览</a>
+                    <a href="{% url 'my_borrows' %}" class="nav-link">我的借阅</a>
+                {% endif %}
+                <div class="nav-search">
+                    <form method="get" action="/">
+                        <input type="text" name="q" placeholder="搜索书名/作者/分类..." value="{{ search_query|default:'' }}">
+                        <button type="submit">搜索</button>
+                    </form>
+                </div>
+                <span class="nav-user">{{ user.username }}（{{ user.get_role_display }}）</span>
+                <a href="{% url 'profile' %}" class="nav-link">个人信息</a>
+                <a href="{% url 'logout' %}" class="nav-link nav-logout">退出</a>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- 消息提示 -->
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="message message-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- 主内容 -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <p>&copy; 2024 校园图书管理系统 | Django 4.2</p>
+    </footer>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
+

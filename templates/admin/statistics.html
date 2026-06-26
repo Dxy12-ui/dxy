@@ -1,0 +1,133 @@
+﻿{% extends "base.html" %}
+{% block title %}借阅数据统计{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+<div class="admin-container">
+    <h2>📊 借阅数据统计</h2>
+    
+    <!-- 概览卡片 -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number">{{ total_borrow_count }}</div>
+            <div class="stat-label">总借阅量</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ active_borrow_count }}</div>
+            <div class="stat-label">当前借阅中</div>
+        </div>
+    </div>
+
+    <!-- 借阅趋势图 -->
+    <div class="chart-section">
+        <h3>📈 月度借阅趋势（近6个月）</h3>
+        <div class="chart-wrapper">
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 热门图书 -->
+    <div class="chart-section">
+        <h3>🔥 图书借阅热度 Top 20</h3>
+        <div class="chart-wrapper">
+            <canvas id="hotBooksChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 学生借阅统计 -->
+    <div class="chart-section">
+        <h3>👤 学生借阅排行 Top 20</h3>
+        <div class="chart-wrapper">
+            <canvas id="studentChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 库存预警 -->
+    <div class="dashboard-section">
+        <h3>⚠️ 库存预警（库存 ≤ 3）</h3>
+        {% if low_stock %}
+        <table class="data-table">
+            <thead>
+                <tr><th>书名</th><th>作者</th><th>当前库存</th><th>总入库</th></tr>
+            </thead>
+            <tbody>
+                {% for book in low_stock %}
+                <tr {% if book.stock == 0 %}class="danger"{% endif %}>
+                    <td>{{ book.title }}</td>
+                    <td>{{ book.author }}</td>
+                    <td><strong>{{ book.stock }}</strong></td>
+                    <td>{{ book.total_num }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>✅ 所有图书库存充足</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+// 月度趋势图
+var trendCtx = document.getElementById("trendChart").getContext("2d");
+new Chart(trendCtx, {
+    type: "bar",
+    data: {
+        labels: {{ monthly_labels_json|safe }},
+        datasets: [{
+            label: "借阅量",
+            data: {{ monthly_counts_json|safe }},
+            backgroundColor: "#4a90d9",
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+});
+
+// 热门图书
+var hotData = {{ hot_books_json|safe }};
+var hotCtx = document.getElementById("hotBooksChart").getContext("2d");
+new Chart(hotCtx, {
+    type: "bar",
+    data: {
+        labels: hotData.map(function(d) { return d.title; }),
+        datasets: [{
+            label: "借阅次数",
+            data: hotData.map(function(d) { return d.count; }),
+            backgroundColor: "#e17055",
+        }]
+    },
+    options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+});
+
+// 学生借阅统计
+var studentData = {{ student_stats_json|safe }};
+var studentCtx = document.getElementById("studentChart").getContext("2d");
+new Chart(studentCtx, {
+    type: "bar",
+    data: {
+        labels: studentData.map(function(d) { return d.username; }),
+        datasets: [{
+            label: "借阅总量",
+            data: studentData.map(function(d) { return d.count; }),
+            backgroundColor: "#00b894",
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+});
+</script>
+{% endblock %}

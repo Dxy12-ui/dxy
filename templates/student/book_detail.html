@@ -1,0 +1,38 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ book.title }} - 图书详情{% endblock %}
+{% block content %}
+<div class="book-detail-container">
+    <a href="/" class="btn btn-sm btn-secondary">&larr; 返回列表</a>
+    
+    <div class="book-detail-card">
+        <h2>{{ book.title }}</h2>
+        <table class="info-table">
+            <tr><th>作者</th><td>{{ book.author }}</td></tr>
+            <tr><th>分类</th><td>{{ book.category.name|default:"未分类" }}</td></tr>
+            <tr><th>出版社</th><td>{{ book.publish|default:"未知" }}</td></tr>
+            <tr><th>当前库存</th><td>{{ book.stock }} / {{ book.total_num }}</td></tr>
+            <tr><th>入库时间</th><td>{{ book.create_time|date:"Y-m-d H:i" }}</td></tr>
+        </table>
+        
+        <div class="book-desc-full">
+            <h3>图书简介</h3>
+            <p>{{ book.desc|default:"暂无简介"|linebreaksbr }}</p>
+        </div>
+
+        {% if user.role == "student" %}
+        <div class="book-actions">
+            {% if has_borrowed %}
+                <p class="text-warning">您已借阅此书，请先归还后再借</p>
+            {% elif book.is_available %}
+                <form method="post" action="{% url 'borrow_book' book.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success btn-lg">📥 立即借阅</button>
+                </form>
+            {% else %}
+                <p class="text-danger">该书库存不足，暂时无法借阅</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
