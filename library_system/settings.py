@@ -1,5 +1,4 @@
 ﻿import os
-import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -62,17 +61,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "library_system.wsgi.application"
 
-# ===== 数据库（Railway 自动注入 DATABASE_URL）=====
-database_url = os.environ.get("DATABASE_URL", "")
-if database_url:
+# ===== 数据库配置 =====
+# Railway 自动注入 DATABASE_URL（PostgreSQL），本地开发使用 SQLite
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+if DATABASE_URL:
     import dj_database_url
-    import ssl
     DATABASES = {
         "default": dj_database_url.config(
-            default=database_url,
+            default=DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
-            ssl_require=bool(os.environ.get("DB_SSL", True)),
         )
     }
 else:
@@ -124,3 +122,5 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+
