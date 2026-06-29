@@ -1,9 +1,11 @@
 ﻿from django.core.management.base import BaseCommand
 from accounts.models import User
-from library.models import Category, Book
+from library.models import Category, Book, BorrowRecord
+from datetime import timedelta
+from django.utils import timezone
 
 class Command(BaseCommand):
-    help = "初始化系统数据：创建管理员、测试学生、图书分类和测试图书"
+    help = "初始化系统数据：创建管理员、测试学生、图书分类、测试图书和借阅记录"
 
     def handle(self, *args, **options):
         self.stdout.write("开始初始化数据...")
@@ -101,6 +103,99 @@ class Command(BaseCommand):
                 created_count += 1
 
         self.stdout.write(self.style.SUCCESS(f"库存为0的测试图书已创建：{len(zero_stock_books)} 本"))
+
+        # 创建测试借阅记录
+        if BorrowRecord.objects.count() == 0:
+            now = timezone.now()
+
+            # 获取学生用户
+            zhangsan = User.objects.get(username="zhangsan")
+            lisi = User.objects.get(username="lisi")
+            wangwu = User.objects.get(username="wangwu")
+
+            # 获取图书映射
+            book_map = {b.title: b for b in Book.objects.all()}
+
+            borrow_records = []
+
+            # zhangsan 的借阅记录
+            borrow_records.extend([
+                BorrowRecord(
+                    user=zhangsan,
+                    book=book_map["Python编程：从入门到实践"],
+                    borrow_date=now - timedelta(days=30),
+                    due_date=now - timedelta(days=15),
+                    is_return=True,
+                    return_date=now - timedelta(days=20),
+                ),
+                BorrowRecord(
+                    user=zhangsan,
+                    book=book_map["三体"],
+                    borrow_date=now - timedelta(days=7),
+                    due_date=now + timedelta(days=23),
+                    is_return=False,
+                ),
+                BorrowRecord(
+                    user=zhangsan,
+                    book=book_map["算法导论"],
+                    borrow_date=now - timedelta(days=3),
+                    due_date=now + timedelta(days=27),
+                    is_return=False,
+                ),
+            ])
+
+            # lisi 的借阅记录
+            borrow_records.extend([
+                BorrowRecord(
+                    user=lisi,
+                    book=book_map["活着"],
+                    borrow_date=now - timedelta(days=14),
+                    due_date=now + timedelta(days=16),
+                    is_return=False,
+                ),
+                BorrowRecord(
+                    user=lisi,
+                    book=book_map["人类简史"],
+                    borrow_date=now - timedelta(days=60),
+                    due_date=now - timedelta(days=30),
+                    is_return=True,
+                    return_date=now - timedelta(days=45),
+                ),
+            ])
+
+            # wangwu 的借阅记录
+            borrow_records.extend([
+                BorrowRecord(
+                    user=wangwu,
+                    book=book_map["新概念英语2"],
+                    borrow_date=now - timedelta(days=5),
+                    due_date=now + timedelta(days=25),
+                    is_return=False,
+                ),
+                BorrowRecord(
+                    user=wangwu,
+                    book=book_map["时间简史"],
+                    borrow_date=now - timedelta(days=45),
+                    due_date=now - timedelta(days=15),
+                    is_return=True,
+                    return_date=now - timedelta(days=20),
+                ),
+                BorrowRecord(
+                    user=wangwu,
+                    book=book_map["经济学原理"],
+                    borrow_date=now - timedelta(days=90),
+                    due_date=now - timedelta(days=60),
+                    is_return=True,
+                    return_date=now - timedelta(days=65),
+                ),
+            ])
+
+            BorrowRecord.objects.bulk_create(borrow_records)
+            self.stdout.write(self.style.SUCCESS(f"测试借阅记录已创建：{len(borrow_records)} 条"))
+        else:
+            self.stdout.write("借阅记录已存在，跳过")
+
         self.stdout.write(self.style.SUCCESS("=== 数据初始化完成 ==="))
         self.stdout.write(f"管理员：admin / admin123")
         self.stdout.write(f"测试学生：zhangsan/123456, lisi/123456, wangwu/123456")
+        self.stdout.write(f"借阅记录：{BorrowRecord.objects.count()} 条（含已归还和借阅中）")
