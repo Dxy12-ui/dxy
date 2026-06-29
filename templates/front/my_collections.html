@@ -1,0 +1,54 @@
+﻿{% extends "base.html" %}
+{% block title %}我的收藏 - 植物查询管理系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>⭐ 我的收藏</h1>
+    <p>您收藏的植物列表</p>
+</div>
+
+{% if collections %}
+<div class="plant-grid">
+    {% for item in collections %}
+    <a href="{% url 'plant_detail' item.plant.id %}" class="card" style="display:block;">
+        {% if item.plant.cover_image %}
+        <img src="{{ item.plant.cover_image.url }}" alt="{{ item.plant.name_cn }}" class="card-img">
+        {% else %}
+        <div class="card-img" style="display:flex;align-items:center;justify-content:center;font-size:3rem;">🌿</div>
+        {% endif %}
+        <div class="card-body">
+            <div class="card-title">{{ item.plant.name_cn }}</div>
+            {% if item.plant.name_en %}<div class="card-text" style="font-style:italic;">{{ item.plant.name_en }}</div>{% endif %}
+            <div class="card-meta">
+                {% if item.plant.category %}<span class="tag tag-category">{{ item.plant.category.name }}</span>{% endif %}
+                <span>📅 {{ item.create_time|date:"Y-m-d" }}</span>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% if collections.has_other_pages %}
+<div class="pagination">
+    {% if collections.has_previous %}
+    <a href="?page={{ collections.previous_page_number }}">上一页</a>
+    {% endif %}
+    {% for num in collections.paginator.page_range %}
+        {% if num == collections.number %}
+        <span class="current">{{ num }}</span>
+        {% elif num > collections.number|add:"-3" and num < collections.number|add:"3" %}
+        <a href="?page={{ num }}">{{ num }}</a>
+        {% endif %}
+    {% endfor %}
+    {% if collections.has_next %}
+    <a href="?page={{ collections.next_page_number }}">下一页</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">⭐</div>
+    <p>还没有收藏任何植物，去<a href="{% url 'front_home' %}">首页</a>看看吧</p>
+</div>
+{% endif %}
+{% endblock %}

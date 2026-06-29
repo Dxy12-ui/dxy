@@ -1,16 +1,38 @@
 ﻿{% extends "base.html" %}
-{% block title %}个人信息{% endblock %}
+{% block title %}个人信息 - 植物查询管理系统{% endblock %}
 {% block content %}
-<div class="profile-container">
-    <h2>个人信息</h2>
-    <div class="profile-card">
-        <table class="info-table">
-            <tr><th>用户名</th><td>{{ user.username }}</td></tr>
-            <tr><th>角色</th><td>{{ user.get_role_display }}</td></tr>
-            <tr><th>注册时间</th><td>{{ user.create_time|date:"Y-m-d H:i" }}</td></tr>
-            <tr><th>邮箱</th><td>{{ user.email|default:"未设置" }}</td></tr>
-        </table>
+<div class="page-header">
+    <h1>⚙️ 个人信息</h1>
+    <p>管理您的账户信息</p>
+</div>
+
+<div style="max-width:600px;margin:0 auto;">
+    <div class="detail-section">
+        <h3>基本信息</h3>
+        <p><strong>用户名：</strong>{{ user.username }}</p>
+        <p><strong>角色：</strong>{{ user.get_role_display }}</p>
+        <p><strong>注册时间：</strong>{{ user.create_time|date:"Y-m-d H:i" }}</p>
     </div>
-    <a href="/" class="btn btn-secondary">返回首页</a>
+
+    <div class="detail-section">
+        <h3>修改密码</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_pwd">
+            <div class="form-group">
+                <label>原密码</label>
+                <input type="password" name="old_password" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>新密码</label>
+                <input type="password" name="new_password" class="form-control" required placeholder="至少6位">
+            </div>
+            <div class="form-group">
+                <label>确认新密码</label>
+                <input type="password" name="new_password2" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">💾 修改密码</button>
+        </form>
+    </div>
 </div>
 {% endblock %}

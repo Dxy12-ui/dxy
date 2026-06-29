@@ -1,44 +1,59 @@
 ﻿{% extends "base.html" %}
-{% block title %}用户管理{% endblock %}
+{% block title %}用户管理 - 后台管理{% endblock %}
 {% block content %}
-<div class="admin-container">
-    <h2>👥 学生用户管理</h2>
-    
-    <table class="data-table">
+<div class="page-header">
+    <h1>👥 用户管理</h1>
+    <p>管理系统注册用户</p>
+</div>
+
+<div class="table-container">
+    <table>
         <thead>
-            <tr><th>ID</th><th>用户名</th><th>邮箱</th><th>注册时间</th><th>状态</th></tr>
+            <tr><th>ID</th><th>用户名</th><th>角色</th><th>状态</th><th>注册时间</th><th>操作</th></tr>
         </thead>
         <tbody>
-            {% for u in page_obj %}
+            {% for u in users %}
             <tr>
                 <td>{{ u.id }}</td>
                 <td>{{ u.username }}</td>
-                <td>{{ u.email|default:"-" }}</td>
-                <td>{{ u.create_time|date:"Y-m-d H:i" }}</td>
+                <td>{{ u.get_role_display }}</td>
                 <td>
-                    {% if u.is_active %}
-                    <span class="badge badge-success">正常</span>
+                    {% if u.is_disabled %}
+                    <span class="tag tag-status-offline">已禁用</span>
                     {% else %}
-                    <span class="badge badge-danger">禁用</span>
+                    <span class="tag tag-status-online">正常</span>
                     {% endif %}
+                </td>
+                <td>{{ u.create_time|date:"Y-m-d" }}</td>
+                <td style="white-space:nowrap;">
+                    <a href="{% url 'admin_user_disable' u.id %}" class="btn btn-sm {% if u.is_disabled %}btn-success{% else %}btn-warning{% endif %}" onclick="return confirm('确定{% if u.is_disabled %}启用{% else %}禁用{% endif %}该用户？')">
+                        {% if u.is_disabled %}启用{% else %}禁用{% endif %}
+                    </a>
+                    <a href="{% url 'admin_user_reset_pwd' u.id %}" class="btn btn-outline btn-sm" onclick="return confirm('确定重置密码为 123456？')">重置密码</a>
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="empty-cell">暂无注册学生</td></tr>
+            <tr><td colspan="6" style="text-align:center;color:var(--text-light);padding:2rem;">暂无用户</td></tr>
             {% endfor %}
         </tbody>
     </table>
+</div>
 
-    {% if page_obj.has_other_pages %}
-    <div class="pagination">
-        {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-sm">上一页</a>
+{% if users.has_other_pages %}
+<div class="pagination">
+    {% if users.has_previous %}
+    <a href="?page={{ users.previous_page_number }}">上一页</a>
+    {% endif %}
+    {% for num in users.paginator.page_range %}
+        {% if num == users.number %}
+        <span class="current">{{ num }}</span>
+        {% elif num > users.number|add:"-3" and num < users.number|add:"3" %}
+        <a href="?page={{ num }}">{{ num }}</a>
         {% endif %}
-        <span>第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}" class="btn btn-sm">下一页</a>
-        {% endif %}
-    </div>
+    {% endfor %}
+    {% if users.has_next %}
+    <a href="?page={{ users.next_page_number }}">下一页</a>
     {% endif %}
 </div>
+{% endif %}
 {% endblock %}

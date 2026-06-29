@@ -1,426 +1,766 @@
 ﻿import json
-from datetime import datetime, timedelta
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required, user_passes_test
+import os
+from datetime import datetime
+from functools import wraps
+
+import requests
+from django.conf import settings
 from django.contrib import messages
-from django.db.models import Count, Q, Sum
-from django.db.models.functions import TruncMonth
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from .models import Category, Book, BorrowRecord
+from django.views.decorators.csrf import csrf_exempt
+
 from accounts.models import User
+from .models import (
+    PlantCategory, PlantInfo, UserCollect,
+    SearchHistory, PlantFeedback, OperationLog,
+)
 
 
-# ==================== 权限装饰器 ====================
-
-def student_required(view_func):
-    """限制仅学生可访问"""
-    def wrapper(request, *args, **kwargs):
-        if request.user.role != "student":
-            messages.error(request, "无权限访问")
-            return redirect("home")
-        return view_func(request, *args, **kwargs)
-    return login_required(wrapper)
-
+# ==================== 工具函数 ====================
 
 def admin_required(view_func):
-    """限制仅管理员可访问"""
+    """管理员权限装饰器"""
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-        if request.user.role != "admin":
-            messages.error(request, "无权限访问")
-            return redirect("home")
+        if not request.user.is_authenticated or request.user.role != "admin":
+            messages.error(request, "无权访问后台管理")
+            return redirect("front_home")
         return view_func(request, *args, **kwargs)
-    return login_required(wrapper)
+    return wrapper
 
 
-# ==================== 学生端功能 ====================
-
-@login_required
-def book_detail(request, book_id):
-    """图书详情页"""
-    book = get_object_or_404(Book, id=book_id)
-    # 检查当前用户是否已借此书且未归还
-    has_borrowed = False
-    if request.user.role == "student":
-        has_borrowed = BorrowRecord.objects.filter(
-            user=request.user, book=book, is_return=False
-        ).exists()
-    context = {
-        "book": book,
-        "has_borrowed": has_borrowed,
-    }
-    return render(request, "student/book_detail.html", context)
-
-
-@student_required
-def borrow_book(request, book_id):
-    """借阅图书"""
-    if request.method != "POST":
-        return redirect("book_detail", book_id=book_id)
-    
-    book = get_object_or_404(Book, id=book_id)
-    
-    # 检查库存
-    if book.stock <= 0:
-        messages.error(request, "该书库存不足，无法借阅")
-        return redirect("book_detail", book_id=book_id)
-    
-    # 检查是否已借此书
-    already_borrowed = BorrowRecord.objects.filter(
-        user=request.user, book=book, is_return=False
-    ).exists()
-    if already_borrowed:
-        messages.error(request, "您已借阅此书，请先归还")
-        return redirect("book_detail", book_id=book_id)
-    
-    # 检查单人最大借阅数量（默认5本）
-    max_borrow = 5
-    current_borrows = BorrowRecord.objects.filter(
-        user=request.user, is_return=False
-    ).count()
-    if current_borrows >= max_borrow:
-        messages.error(request, f"借阅已达上限（{max_borrow}本），请先归还部分图书")
-        return redirect("book_detail", book_id=book_id)
-    
-    # 执行借阅
-    book.stock -= 1
-    book.save()
-    BorrowRecord.objects.create(
-        user=request.user,
-        book=book,
-        due_date=timezone.now() + timedelta(days=30),
+def log_operation(user, action, target_type="", target_id=None, detail="", request=None):
+    """记录操作日志"""
+    ip = ""
+    if request:
+        ip = request.META.get("REMOTE_ADDR", "")
+    OperationLog.objects.create(
+        user=user, action=action, target_type=target_type,
+        target_id=target_id, detail=detail, ip_address=ip,
     )
-    messages.success(request, f"成功借阅《{book.title}》")
-    return redirect("my_borrows")
 
 
-@student_required
-def my_borrows(request):
-    """我的借阅列表"""
-    records = BorrowRecord.objects.filter(user=request.user).order_by("-borrow_date")
-    return render(request, "student/my_borrows.html", {"records": records, "current_time": timezone.now()})
+def recognize_plant(image_path):
+    """调用第三方植物识别API"""
+    api_key = settings.PLANT_API_KEY
+    api_url = settings.PLANT_API_URL
+    if not api_key:
+        return None, "未配置识图API密钥"
+    try:
+        with open(image_path, "rb") as f:
+            files = {"images": f}
+            headers = {"Api-Key": api_key}
+            resp = requests.post(api_url, files=files, headers=headers, timeout=30)
+            if resp.status_code != 200:
+                return None, f"API请求失败: {resp.status_code}"
+            data = resp.json()
+            results = []
+            for suggestion in data.get("result", {}).get("classification", {}).get("suggestions", [])[:5]:
+                results.append({
+                    "name": suggestion.get("name", "未知"),
+                    "probability": round(suggestion.get("probability", 0) * 100, 1),
+                    "details": suggestion.get("details", {}),
+                })
+            return results, None
+    except Exception as e:
+        return None, str(e)
 
 
-@student_required
-def return_book(request, record_id):
-    """归还图书"""
-    if request.method != "POST":
-        return redirect("my_borrows")
-    
-    record = get_object_or_404(BorrowRecord, id=record_id, user=request.user, is_return=False)
-    
-    # 归还：库存+1，标记归还
-    record.book.stock += 1
-    record.book.save()
-    record.is_return = True
-    record.return_date = timezone.now()
-    record.save()
-    
-    messages.success(request, f"成功归还《{record.book.title}》")
-    return redirect("my_borrows")
+# ==================== 前台首页 ====================
+
+def front_home(request):
+    """系统首页"""
+    # 热门植物（按浏览量）
+    hot_plants = PlantInfo.objects.filter(
+        status="online", is_deleted=False
+    ).order_by("-view_count")[:8]
+
+    # 最新录入
+    new_plants = PlantInfo.objects.filter(
+        status="online", is_deleted=False
+    ).order_by("-create_time")[:8]
+
+    # 父级分类
+    categories = PlantCategory.objects.filter(parent__isnull=True).order_by("sort_order")
+
+    # 热门分类（植物数最多的前6个）
+    hot_categories = PlantCategory.objects.filter(
+        parent__isnull=True
+    ).annotate(
+        plant_count=Count("plantinfo", filter=Q(plantinfo__status="online", plantinfo__is_deleted=False))
+    ).filter(plant_count__gt=0).order_by("-plant_count")[:6]
+
+    # 统计数据
+    plant_count = PlantInfo.objects.filter(status="online", is_deleted=False).count()
+    category_count = PlantCategory.objects.count()
+    user_count = User.objects.filter(role="user").count()
+
+    return render(request, "front/home.html", {
+        "hot_plants": hot_plants,
+        "new_plants": new_plants,
+        "categories": categories,
+        "hot_categories": hot_categories,
+        "plant_count": plant_count,
+        "category_count": category_count,
+        "user_count": user_count,
+    })
+
+
+# ==================== 文字搜索 ====================
+
+def plant_search(request):
+    """文字描述查询"""
+    query = request.GET.get("q", "").strip()
+    category_id = request.GET.get("category", "")
+    plant_type = request.GET.get("plant_type", "")
+    is_toxic = request.GET.get("is_toxic", "")
+    is_protected = request.GET.get("is_protected", "")
+    sort = request.GET.get("sort", "update_time")
+    page = request.GET.get("page", 1)
+
+    plants = PlantInfo.objects.filter(status="online", is_deleted=False)
+
+    if query:
+        plants = plants.filter(
+            Q(name_cn__icontains=query) |
+            Q(name_en__icontains=query) |
+            Q(alias__icontains=query)
+        )
+        # 记录搜索历史
+        if request.user.is_authenticated:
+            SearchHistory.objects.create(
+                user=request.user, keyword=query, search_type="text"
+            )
+            # 清理过多历史（保留最近100条）
+            user_history = SearchHistory.objects.filter(
+                user=request.user, search_type="text"
+            ).order_by("-create_time")
+            if user_history.count() > 100:
+                for h in user_history[100:]:
+                    h.delete()
+
+    if category_id:
+        plants = plants.filter(category_id=int(category_id))
+    if plant_type:
+        plants = plants.filter(category_id=int(plant_type))
+    if is_toxic:
+        plants = plants.filter(is_toxic=(is_toxic == "1"))
+    if is_protected:
+        plants = plants.filter(is_protected=(is_protected == "1"))
+
+    if sort == "update_time":
+        plants = plants.order_by("-update_time")
+    elif sort == "hot":
+        plants = plants.order_by("-view_count")
+    elif sort == "create_time":
+        plants = plants.order_by("-create_time")
+
+    paginator = Paginator(plants, 12)
+    page_obj = paginator.get_page(page)
+
+    categories = PlantCategory.objects.filter(parent__isnull=True).order_by("sort_order")
+
+    return render(request, "front/search.html", {
+        "plants": page_obj,
+        "query": query,
+        "category_id": category_id,
+        "plant_type": plant_type,
+        "is_toxic": is_toxic,
+        "is_protected": is_protected,
+        "sort": sort,
+        "categories": categories,
+    })
+
+
+# ==================== 图片识别 ====================
+
+@login_required
+def plant_image_search(request):
+    """图片识别查询页面"""
+    result = None
+    error = None
+
+    if request.method == "POST" and request.FILES.get("image"):
+        image_file = request.FILES["image"]
+        # 校验格式
+        ext = os.path.splitext(image_file.name)[1].lower()
+        if ext not in [".jpg", ".jpeg", ".png"]:
+            error = "仅支持 JPG、PNG 格式的图片"
+        elif image_file.size > 10 * 1024 * 1024:
+            error = "图片大小不能超过 10MB"
+        else:
+            # 保存临时文件
+            upload_dir = os.path.join(settings.MEDIA_ROOT, "temp")
+            os.makedirs(upload_dir, exist_ok=True)
+            temp_path = os.path.join(upload_dir, f"plant_{request.user.id}_{int(datetime.now().timestamp())}{ext}")
+            with open(temp_path, "wb+") as f:
+                for chunk in image_file.chunks():
+                    f.write(chunk)
+
+            # 调用识图API
+            results, api_error = recognize_plant(temp_path)
+            if api_error:
+                error = f"识别失败：{api_error}"
+                # 降级：尝试本地匹配
+                if "未配置" in api_error or "API请求失败" in api_error:
+                    error = "图片识别服务暂不可用，请尝试文字搜索"
+            elif results:
+                # 尝试匹配本地数据库
+                matched_plants = []
+                for r in results:
+                    local = PlantInfo.objects.filter(
+                        Q(name_cn__icontains=r["name"]) |
+                        Q(name_en__icontains=r["name"])
+                    ).filter(status="online", is_deleted=False).first()
+                    if local:
+                        matched_plants.append({
+                            "plant": local,
+                            "api_name": r["name"],
+                            "probability": r["probability"],
+                        })
+                result = {
+                    "api_results": results,
+                    "matched_plants": matched_plants,
+                }
+                # 保存搜索历史
+                SearchHistory.objects.create(
+                    user=request.user, keyword=f"[图片识别] {results[0]['name']}", search_type="image"
+                )
+            else:
+                error = "未能识别出植物，请尝试更换图片或使用文字搜索"
+
+            # 清理临时文件
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+
+    return render(request, "front/image_search.html", {
+        "result": result,
+        "error": error,
+    })
+
+
+# ==================== 植物详情 ====================
+
+def plant_detail(request, plant_id):
+    """植物详情页"""
+    plant = get_object_or_404(PlantInfo, id=plant_id, is_deleted=False)
+    if plant.status != "online" and not (
+        request.user.is_authenticated and request.user.role == "admin"
+    ):
+        messages.error(request, "该植物暂未上线")
+        return redirect("front_home")
+
+    # 增加浏览量
+    plant.view_count += 1
+    plant.save(update_fields=["view_count"])
+
+    # 用户是否收藏
+    is_collected = False
+    if request.user.is_authenticated:
+        is_collected = UserCollect.objects.filter(
+            user=request.user, plant=plant
+        ).exists()
+
+    # 相关植物（同分类）
+    related_plants = []
+    if plant.category:
+        related_plants = PlantInfo.objects.filter(
+            category=plant.category, status="online", is_deleted=False
+        ).exclude(id=plant.id).order_by("-view_count")[:6]
+
+    return render(request, "front/plant_detail.html", {
+        "plant": plant,
+        "is_collected": is_collected,
+        "related_plants": related_plants,
+    })
+
+
+# ==================== 收藏功能 ====================
+
+@login_required
+def plant_collect_toggle(request, plant_id):
+    """收藏/取消收藏"""
+    plant = get_object_or_404(PlantInfo, id=plant_id, is_deleted=False)
+    collect = UserCollect.objects.filter(user=request.user, plant=plant).first()
+    if collect:
+        collect.delete()
+        plant.collect_count = max(0, plant.collect_count - 1)
+        plant.save(update_fields=["collect_count"])
+        return JsonResponse({"status": "uncollected", "count": plant.collect_count})
+    else:
+        UserCollect.objects.create(user=request.user, plant=plant)
+        plant.collect_count += 1
+        plant.save(update_fields=["collect_count"])
+        return JsonResponse({"status": "collected", "count": plant.collect_count})
 
 
 @login_required
-def profile_view(request):
-    """个人信息查看"""
-    return render(request, "profile.html")
+def my_collections(request):
+    """我的收藏"""
+    collections = UserCollect.objects.filter(
+        user=request.user
+    ).select_related("plant").order_by("-create_time")
+
+    paginator = Paginator(collections, 12)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    return render(request, "front/my_collections.html", {
+        "collections": page_obj,
+    })
 
 
-# ==================== 管理员端功能 ====================
+# ==================== 搜索历史 ====================
+
+@login_required
+def my_history(request):
+    """我的查询历史"""
+    history = SearchHistory.objects.filter(
+        user=request.user
+    ).order_by("-create_time")
+
+    paginator = Paginator(history, 20)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    return render(request, "front/my_history.html", {
+        "history": page_obj,
+    })
+
+
+@login_required
+def clear_history(request):
+    """清空搜索历史"""
+    SearchHistory.objects.filter(user=request.user).delete()
+    messages.success(request, "搜索历史已清空")
+    return redirect("my_history")
+
+
+# ==================== 纠错反馈 ====================
+
+@login_required
+def submit_feedback(request, plant_id):
+    """提交纠错反馈"""
+    plant = get_object_or_404(PlantInfo, id=plant_id, is_deleted=False)
+    if request.method == "POST":
+        content = request.POST.get("content", "").strip()
+        if not content:
+            messages.error(request, "请输入纠错内容")
+            return redirect("plant_detail", plant_id=plant_id)
+
+        PlantFeedback.objects.create(
+            user=request.user, plant=plant, content=content, status="pending"
+        )
+        messages.success(request, "纠错反馈已提交，管理员审核后将更新数据，感谢您的反馈！")
+        return redirect("plant_detail", plant_id=plant_id)
+    return redirect("plant_detail", plant_id=plant_id)
+
+
+@login_required
+def my_feedbacks(request):
+    """我的反馈"""
+    feedbacks = PlantFeedback.objects.filter(
+        user=request.user
+    ).select_related("plant").order_by("-create_time")
+
+    paginator = Paginator(feedbacks, 10)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    return render(request, "front/my_feedbacks.html", {
+        "feedbacks": page_obj,
+    })
+
+
+# ==================== 后台仪表盘 ====================
 
 @admin_required
 def admin_dashboard(request):
     """管理员仪表盘"""
-    total_books = Book.objects.count()
-    total_students = User.objects.filter(role="student").count()
-    total_borrows = BorrowRecord.objects.count()
-    active_borrows = BorrowRecord.objects.filter(is_return=False).count()
-    
-    # 库存不足图书（库存 <= 3）
-    low_stock_books = Book.objects.filter(stock__lte=3).order_by("stock")
-    
-    # 热门图书 Top 10
-    hot_books = Book.objects.annotate(
-        borrow_count=Count("borrowrecord")
-    ).order_by("-borrow_count")[:10]
-    
-    # 月度借阅趋势（最近6个月）
-    six_months_ago = timezone.now() - timedelta(days=180)
-    monthly_data = (
-        BorrowRecord.objects.filter(borrow_date__gte=six_months_ago)
-        .annotate(month=TruncMonth("borrow_date"))
-        .values("month")
-        .annotate(count=Count("id"))
-        .order_by("month")
-    )
-    monthly_data = [
-        {"month": item["month"].strftime("%Y-%m"), "count": item["count"]}
-        for item in monthly_data
-    ]
-    
-    context = {
-        "total_books": total_books,
-        "total_students": total_students,
-        "total_borrows": total_borrows,
-        "active_borrows": active_borrows,
-        "low_stock_books": low_stock_books,
-        "hot_books": hot_books,
-        "monthly_data": list(monthly_data),
-    }
-    return render(request, "admin/dashboard.html", context)
+    # 统计数据
+    total_plants = PlantInfo.objects.filter(is_deleted=False).count()
+    online_plants = PlantInfo.objects.filter(status="online", is_deleted=False).count()
+    pending_plants = PlantInfo.objects.filter(status="pending", is_deleted=False).count()
+    draft_plants = PlantInfo.objects.filter(status="draft", is_deleted=False).count()
+    total_users = User.objects.filter(role="user").count()
+    total_categories = PlantCategory.objects.count()
+    pending_feedbacks = PlantFeedback.objects.filter(status="pending").count()
+    total_views = PlantInfo.objects.aggregate(s=Sum("view_count"))["s"] or 0
+    total_collects = UserCollect.objects.count()
 
+    # 最近操作日志
+    recent_logs = OperationLog.objects.select_related("user").order_by("-create_time")[:20]
 
-@admin_required
-def admin_book_list(request):
-    """图书管理列表"""
-    search_query = request.GET.get("q", "").strip()
-    books = Book.objects.all()
-    if search_query:
-        books = books.filter(
-            Q(title__icontains=search_query) |
-            Q(author__icontains=search_query) |
-            Q(category__name__icontains=search_query)
-        )
-    
-    paginator = Paginator(books.order_by("-create_time"), 20)
-    page_number = request.GET.get("page", 1)
-    page_obj = paginator.get_page(page_number)
-    
-    return render(request, "admin/book_list.html", {
-        "page_obj": page_obj,
-        "search_query": search_query,
-        "categories": Category.objects.all(),
+    return render(request, "admin/dashboard.html", {
+        "total_plants": total_plants,
+        "online_plants": online_plants,
+        "pending_plants": pending_plants,
+        "draft_plants": draft_plants,
+        "total_users": total_users,
+        "total_categories": total_categories,
+        "pending_feedbacks": pending_feedbacks,
+        "total_views": total_views,
+        "total_collects": total_collects,
+        "recent_logs": recent_logs,
     })
 
 
+# ==================== 植物管理 ====================
+
 @admin_required
-def admin_book_add(request):
-    """添加图书"""
-    if request.method == "POST":
-        title = request.POST.get("title", "").strip()
-        author = request.POST.get("author", "").strip()
-        category_id = request.POST.get("category")
-        total_num = int(request.POST.get("total_num", 1))
-        desc = request.POST.get("desc", "").strip()
-        publish = request.POST.get("publish", "").strip()
-        
-        if not title or not author:
-            messages.error(request, "书名和作者不能为空")
-            return redirect("admin_book_add")
-        
-        category = None
-        if category_id:
-            category = get_object_or_404(Category, id=category_id)
-        
-        Book.objects.create(
-            title=title,
-            author=author,
-            category=category,
-            stock=total_num,
-            total_num=total_num,
-            desc=desc,
-            publish=publish,
+def admin_plant_list(request):
+    """植物列表管理"""
+    status_filter = request.GET.get("status", "")
+    category_filter = request.GET.get("category", "")
+    search = request.GET.get("q", "").strip()
+    page = request.GET.get("page", 1)
+
+    plants = PlantInfo.objects.filter(is_deleted=False).select_related("category")
+
+    if status_filter:
+        plants = plants.filter(status=status_filter)
+    if category_filter:
+        plants = plants.filter(category_id=int(category_filter))
+    if search:
+        plants = plants.filter(
+            Q(name_cn__icontains=search) |
+            Q(name_en__icontains=search) |
+            Q(alias__icontains=search)
         )
-        messages.success(request, "图书添加成功")
-        return redirect("admin_book_list")
-    
-    categories = Category.objects.all()
-    return render(request, "admin/book_form.html", {"categories": categories, "action": "添加"})
 
+    plants = plants.order_by("-update_time")
+    paginator = Paginator(plants, 15)
+    page_obj = paginator.get_page(page)
 
-@admin_required
-def admin_book_edit(request, book_id):
-    """编辑图书"""
-    book = get_object_or_404(Book, id=book_id)
-    if request.method == "POST":
-        book.title = request.POST.get("title", "").strip()
-        book.author = request.POST.get("author", "").strip()
-        category_id = request.POST.get("category")
-        new_total = int(request.POST.get("total_num", book.total_num))
-        diff = new_total - book.total_num
-        book.total_num = new_total
-        book.stock = book.stock + diff  # 库存同步调整
-        book.desc = request.POST.get("desc", "").strip()
-        book.publish = request.POST.get("publish", "").strip()
-        
-        if category_id:
-            book.category = get_object_or_404(Category, id=category_id)
-        else:
-            book.category = None
-        
-        book.save()
-        messages.success(request, "图书修改成功")
-        return redirect("admin_book_list")
-    
-    categories = Category.objects.all()
-    return render(request, "admin/book_form.html", {
-        "book": book,
+    categories = PlantCategory.objects.filter(parent__isnull=True).order_by("sort_order")
+
+    return render(request, "admin/plant_list.html", {
+        "plants": page_obj,
         "categories": categories,
-        "action": "编辑",
+        "status_filter": status_filter,
+        "category_filter": category_filter,
+        "search": search,
+        "status_choices": PlantInfo.STATUS_CHOICES,
     })
 
 
 @admin_required
-def admin_book_delete(request, book_id):
-    """删除图书"""
-    if request.method != "POST":
-        return redirect("admin_book_list")
-    book = get_object_or_404(Book, id=book_id)
-    book.delete()
-    messages.success(request, "图书已删除")
-    return redirect("admin_book_list")
+def admin_plant_add(request):
+    """新增植物"""
+    categories = PlantCategory.objects.all().order_by("parent__sort_order", "sort_order")
+    if request.method == "POST":
+        name_cn = request.POST.get("name_cn", "").strip()
+        if not name_cn:
+            messages.error(request, "中文名称不能为空")
+            return render(request, "admin/plant_form.html", {"categories": categories, "is_edit": False})
+        if PlantInfo.objects.filter(name_cn=name_cn, is_deleted=False).exists():
+            messages.error(request, "该植物名称已存在")
+            return render(request, "admin/plant_form.html", {"categories": categories, "is_edit": False})
 
+        plant = PlantInfo(
+            name_cn=name_cn,
+            name_en=request.POST.get("name_en", "").strip(),
+            alias=request.POST.get("alias", "").strip(),
+            morphology=request.POST.get("morphology", "").strip(),
+            habitat=request.POST.get("habitat", "").strip(),
+            cultivation=request.POST.get("cultivation", "").strip(),
+            value_desc=request.POST.get("value_desc", "").strip(),
+            is_toxic=request.POST.get("is_toxic") == "on",
+            toxicity_desc=request.POST.get("toxicity_desc", "").strip(),
+            is_protected=request.POST.get("is_protected") == "on",
+            protection_level=request.POST.get("protection_level", "").strip(),
+            status=request.POST.get("status", "draft"),
+            created_by=request.user,
+            updated_by=request.user,
+        )
+        category_id = request.POST.get("category", "")
+        if category_id:
+            plant.category_id = int(category_id)
+        if request.FILES.get("cover_image"):
+            plant.cover_image = request.FILES["cover_image"]
+        plant.save()
+
+        log_operation(request.user, "create", "plant", plant.id, f"新增植物：{plant.name_cn}", request)
+        messages.success(request, f"植物「{plant.name_cn}」添加成功")
+        return redirect("admin_plant_list")
+
+    return render(request, "admin/plant_form.html", {"categories": categories, "is_edit": False})
+
+
+@admin_required
+def admin_plant_edit(request, plant_id):
+    """编辑植物"""
+    plant = get_object_or_404(PlantInfo, id=plant_id, is_deleted=False)
+    categories = PlantCategory.objects.all().order_by("parent__sort_order", "sort_order")
+
+    if request.method == "POST":
+        new_name = request.POST.get("name_cn", "").strip()
+        if not new_name:
+            messages.error(request, "中文名称不能为空")
+            return render(request, "admin/plant_form.html", {"plant": plant, "categories": categories, "is_edit": True})
+
+        old_name = plant.name_cn
+        if new_name != old_name and PlantInfo.objects.filter(name_cn=new_name, is_deleted=False).exclude(id=plant.id).exists():
+            messages.error(request, "该植物名称已被其他记录使用")
+            return render(request, "admin/plant_form.html", {"plant": plant, "categories": categories, "is_edit": True})
+
+        plant.name_cn = new_name
+        plant.name_en = request.POST.get("name_en", "").strip()
+        plant.alias = request.POST.get("alias", "").strip()
+        plant.morphology = request.POST.get("morphology", "").strip()
+        plant.habitat = request.POST.get("habitat", "").strip()
+        plant.cultivation = request.POST.get("cultivation", "").strip()
+        plant.value_desc = request.POST.get("value_desc", "").strip()
+        plant.is_toxic = request.POST.get("is_toxic") == "on"
+        plant.toxicity_desc = request.POST.get("toxicity_desc", "").strip()
+        plant.is_protected = request.POST.get("is_protected") == "on"
+        plant.protection_level = request.POST.get("protection_level", "").strip()
+        plant.updated_by = request.user
+
+        category_id = request.POST.get("category", "")
+        plant.category_id = int(category_id) if category_id else None
+
+        if request.FILES.get("cover_image"):
+            plant.cover_image = request.FILES["cover_image"]
+
+        new_status = request.POST.get("status", plant.status)
+        plant.status = new_status
+        plant.save()
+
+        action = "rename" if old_name != new_name else "edit"
+        log_operation(request.user, action, "plant", plant.id, f"编辑植物：{old_name} -> {new_name}", request)
+        messages.success(request, f"植物「{plant.name_cn}」更新成功")
+        return redirect("admin_plant_list")
+
+    return render(request, "admin/plant_form.html", {"plant": plant, "categories": categories, "is_edit": True})
+
+
+@admin_required
+def admin_plant_delete(request, plant_id):
+    """逻辑删除植物"""
+    plant = get_object_or_404(PlantInfo, id=plant_id)
+    plant.is_deleted = True
+    plant.status = "offline"
+    plant.save()
+    log_operation(request.user, "delete", "plant", plant.id, f"下架/删除植物：{plant.name_cn}", request)
+    messages.success(request, f"植物「{plant.name_cn}」已下架")
+    return redirect("admin_plant_list")
+
+
+@admin_required
+def admin_plant_status(request, plant_id):
+    """修改植物状态"""
+    if request.method == "POST":
+        plant = get_object_or_404(PlantInfo, id=plant_id, is_deleted=False)
+        new_status = request.POST.get("status", "")
+        if new_status in dict(PlantInfo.STATUS_CHOICES):
+            old_status = plant.get_status_display()
+            plant.status = new_status
+            plant.save()
+            log_operation(request.user, "review", "plant", plant.id, f"状态变更：{old_status} -> {plant.get_status_display()}", request)
+            messages.success(request, f"「{plant.name_cn}」状态已更新为 {plant.get_status_display()}")
+    return redirect("admin_plant_list")
+
+
+# ==================== 分类管理 ====================
 
 @admin_required
 def admin_category_list(request):
-    """分类管理"""
+    """分类列表"""
+    parents = PlantCategory.objects.filter(parent__isnull=True).order_by("sort_order")
+    all_categories = PlantCategory.objects.all().order_by("parent__sort_order", "sort_order")
+    return render(request, "admin/category_list.html", {
+        "parents": parents,
+        "all_categories": all_categories,
+    })
+
+
+@admin_required
+def admin_category_add(request):
+    """新增分类"""
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
-        if name:
-            Category.objects.get_or_create(name=name)
-            messages.success(request, "分类添加成功")
-        return redirect("admin_category_list")
-    
-    categories = Category.objects.annotate(book_count=Count("book")).all()
-    return render(request, "admin/category_list.html", {"categories": categories})
+        if not name:
+            messages.error(request, "分类名称不能为空")
+            return redirect("admin_category_list")
+        parent_id = request.POST.get("parent", "")
+        parent = None
+        if parent_id:
+            parent = get_object_or_404(PlantCategory, id=int(parent_id))
+        PlantCategory.objects.create(
+            name=name, parent=parent,
+            sort_order=int(request.POST.get("sort_order", 0))
+        )
+        log_operation(request.user, "category_mgr", "category", None, f"新增分类：{name}", request)
+        messages.success(request, f"分类「{name}」添加成功")
+    return redirect("admin_category_list")
 
 
 @admin_required
 def admin_category_edit(request, cat_id):
     """编辑分类"""
-    category = get_object_or_404(Category, id=cat_id)
+    category = get_object_or_404(PlantCategory, id=cat_id)
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
-        if name:
-            category.name = name
-            category.save()
-            messages.success(request, "分类修改成功")
-        return redirect("admin_category_list")
+        if not name:
+            messages.error(request, "分类名称不能为空")
+            return redirect("admin_category_list")
+        category.name = name
+        parent_id = request.POST.get("parent", "")
+        category.parent = PlantCategory.objects.filter(id=int(parent_id)).first() if parent_id else None
+        category.sort_order = int(request.POST.get("sort_order", 0))
+        category.save()
+        log_operation(request.user, "category_mgr", "category", category.id, f"编辑分类：{name}", request)
+        messages.success(request, f"分类「{name}」更新成功")
     return redirect("admin_category_list")
 
 
 @admin_required
 def admin_category_delete(request, cat_id):
     """删除分类"""
-    if request.method != "POST":
-        return redirect("admin_category_list")
-    category = get_object_or_404(Category, id=cat_id)
+    category = get_object_or_404(PlantCategory, id=cat_id)
+    name = category.name
+    # 将子分类提升或删除
+    PlantCategory.objects.filter(parent=category).update(parent=category.parent)
     category.delete()
-    messages.success(request, "分类已删除")
+    log_operation(request.user, "category_mgr", "category", cat_id, f"删除分类：{name}", request)
+    messages.success(request, f"分类「{name}」已删除")
     return redirect("admin_category_list")
 
 
+# ==================== 反馈审核 ====================
+
 @admin_required
-def admin_borrow_records(request):
-    """全校借阅记录"""
-    records = BorrowRecord.objects.select_related("user", "book").all().order_by("-borrow_date")
-    
-    # 筛选
-    status = request.GET.get("status", "")
-    if status == "active":
-        records = records.filter(is_return=False)
-    elif status == "returned":
-        records = records.filter(is_return=True)
-    
-    search = request.GET.get("q", "").strip()
-    if search:
-        records = records.filter(
-            Q(user__username__icontains=search) |
-            Q(book__title__icontains=search)
-        )
-    
-    paginator = Paginator(records, 20)
-    page_number = request.GET.get("page", 1)
-    page_obj = paginator.get_page(page_number)
-    
-    return render(request, "admin/borrow_records.html", {
-        "page_obj": page_obj,
-        "status": status, "search_query": search, "current_time": timezone.now(),
+def admin_feedback_list(request):
+    """反馈审核列表"""
+    status_filter = request.GET.get("status", "")
+    page = request.GET.get("page", 1)
+
+    feedbacks = PlantFeedback.objects.select_related("user", "plant").all()
+    if status_filter:
+        feedbacks = feedbacks.filter(status=status_filter)
+    feedbacks = feedbacks.order_by("-create_time")
+
+    paginator = Paginator(feedbacks, 15)
+    page_obj = paginator.get_page(page)
+
+    return render(request, "admin/feedback_list.html", {
+        "feedbacks": page_obj,
+        "status_filter": status_filter,
     })
 
 
 @admin_required
-def admin_force_return(request, record_id):
-    """强制归还"""
-    if request.method != "POST":
-        return redirect("admin_borrow_records")
-    
-    record = get_object_or_404(BorrowRecord, id=record_id, is_return=False)
-    record.book.stock += 1
-    record.book.save()
-    record.is_return = True
-    record.return_date = timezone.now()
-    record.save()
-    messages.success(request, f"已强制归还《{record.book.title}》（借阅人：{record.user.username}）")
-    return redirect("admin_borrow_records")
+def admin_feedback_review(request, feedback_id):
+    """审核反馈"""
+    feedback = get_object_or_404(PlantFeedback, id=feedback_id)
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+        reply = request.POST.get("reply", "").strip()
+        if action == "approve":
+            feedback.status = "approved"
+            feedback.reply = reply or "已采纳，感谢您的反馈"
+            # 可选：同步更新植物数据
+        elif action == "reject":
+            feedback.status = "rejected"
+            feedback.reply = reply or "经核实，信息无误"
+            if not reply:
+                messages.error(request, "驳回需填写原因")
+                return redirect("admin_feedback_list")
+        feedback.reviewer = request.user
+        feedback.review_time = timezone.now()
+        feedback.save()
+        log_operation(request.user, "review", "feedback", feedback.id, f"审核反馈: {action}", request)
+        messages.success(request, "反馈审核完成")
+    return redirect("admin_feedback_list")
 
 
-@admin_required
-def admin_statistics(request):
-    """借阅数据统计页面"""
-    # 图书借阅热度
-    hot_books = Book.objects.annotate(
-        borrow_count=Count("borrowrecord")
-    ).order_by("-borrow_count")[:20]
-    
-    hot_books_data = [
-        {"title": b.title, "count": b.borrow_count} for b in hot_books
-    ]
-    
-    # 学生借阅统计
-    student_stats = User.objects.filter(role="student").annotate(
-        borrow_count=Count("borrowrecord")
-    ).order_by("-borrow_count")[:20]
-    
-    student_stats_data = [
-        {"username": s.username, "count": s.borrow_count} for s in student_stats
-    ]
-    
-    # 月度借阅趋势
-    six_months_ago = timezone.now() - timedelta(days=180)
-    monthly_data = (
-        BorrowRecord.objects.filter(borrow_date__gte=six_months_ago)
-        .annotate(month=TruncMonth("borrow_date"))
-        .values("month")
-        .annotate(count=Count("id"))
-        .order_by("month")
-    )
-    monthly_data = [
-        {"month": item["month"].strftime("%Y-%m"), "count": item["count"]}
-        for item in monthly_data
-    ]
-    
-    monthly_labels = [item["month"] for item in monthly_data]
-    monthly_counts = [item["count"] for item in monthly_data]
-    
-    # 库存预警（库存 <= 3）
-    low_stock = Book.objects.filter(stock__lte=3).order_by("stock")
-    
-    # 总借阅量
-    total_borrow_count = BorrowRecord.objects.count()
-    active_borrow_count = BorrowRecord.objects.filter(is_return=False).count()
-    
-    context = {
-        "hot_books_json": json.dumps(hot_books_data, ensure_ascii=False),
-        "student_stats_json": json.dumps(student_stats_data, ensure_ascii=False),
-        "monthly_labels_json": json.dumps(monthly_labels),
-        "monthly_counts_json": json.dumps(monthly_counts),
-        "low_stock": low_stock,
-        "total_borrow_count": total_borrow_count,
-        "active_borrow_count": active_borrow_count,
-    }
-    return render(request, "admin/statistics.html", context)
-
+# ==================== 用户管理 ====================
 
 @admin_required
 def admin_user_list(request):
-    """用户管理"""
-    users = User.objects.filter(role="student").order_by("-create_time")
+    """用户列表"""
+    users = User.objects.filter(role="user").order_by("-create_time")
     paginator = Paginator(users, 20)
-    page_number = request.GET.get("page", 1)
-    page_obj = paginator.get_page(page_number)
-    
-    return render(request, "admin/user_list.html", {"page_obj": page_obj})
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    return render(request, "admin/user_list.html", {"users": page_obj})
 
 
+@admin_required
+def admin_user_disable(request, user_id):
+    """禁用/启用用户"""
+    target = get_object_or_404(User, id=user_id)
+    target.is_disabled = not target.is_disabled
+    target.save()
+    action = "禁用" if target.is_disabled else "启用"
+    log_operation(request.user, "user_mgr", "user", user_id, f"{action}用户：{target.username}", request)
+    messages.success(request, f"用户「{target.username}」已{action}")
+    return redirect("admin_user_list")
+
+
+@admin_required
+def admin_user_reset_pwd(request, user_id):
+    """重置用户密码"""
+    target = get_object_or_404(User, id=user_id)
+    target.set_password("123456")
+    target.save()
+    log_operation(request.user, "user_mgr", "user", user_id, f"重置密码：{target.username}", request)
+    messages.success(request, f"用户「{target.username}」密码已重置为 123456")
+    return redirect("admin_user_list")
+
+
+# ==================== 统计数据 ====================
+
+@admin_required
+def admin_statistics(request):
+    """数据统计"""
+    total_plants = PlantInfo.objects.filter(is_deleted=False).count()
+    online_plants = PlantInfo.objects.filter(status="online", is_deleted=False).count()
+    total_users = User.objects.filter(role="user").count()
+    total_views = PlantInfo.objects.aggregate(s=Sum("view_count"))["s"] or 0
+    total_collects = UserCollect.objects.count()
+    total_feedbacks = PlantFeedback.objects.count()
+    pending_feedbacks = PlantFeedback.objects.filter(status="pending").count()
+
+    # 分类分布
+    category_stats = PlantCategory.objects.filter(parent__isnull=True).annotate(
+        plant_count=Count("plantinfo", filter=Q(plantinfo__is_deleted=False))
+    ).order_by("-plant_count")[:10]
+
+    return render(request, "admin/statistics.html", {
+        "total_plants": total_plants,
+        "online_plants": online_plants,
+        "total_users": total_users,
+        "total_views": total_views,
+        "total_collects": total_collects,
+        "total_feedbacks": total_feedbacks,
+        "pending_feedbacks": pending_feedbacks,
+        "category_stats": category_stats,
+    })
+
+
+# ==================== 操作日志 ====================
+
+@admin_required
+def admin_operation_logs(request):
+    """操作日志"""
+    action_filter = request.GET.get("action", "")
+    page = request.GET.get("page", 1)
+
+    logs = OperationLog.objects.select_related("user").all()
+    if action_filter:
+        logs = logs.filter(action=action_filter)
+    logs = logs.order_by("-create_time")
+
+    paginator = Paginator(logs, 30)
+    page_obj = paginator.get_page(page)
+
+    return render(request, "admin/operation_logs.html", {
+        "logs": page_obj,
+        "action_filter": action_filter,
+        "action_choices": OperationLog.ACTION_CHOICES,
+    })

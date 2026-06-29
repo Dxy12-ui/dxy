@@ -1,43 +1,67 @@
 ﻿{% extends "base.html" %}
-{% block title %}分类管理{% endblock %}
+{% block title %}分类管理 - 后台管理{% endblock %}
 {% block content %}
-<div class="admin-container">
-    <div class="admin-header">
-        <h2>🏷️ 分类管理</h2>
-        <form method="post" class="inline-form">
-            {% csrf_token %}
-            <input type="text" name="name" placeholder="新分类名称" required>
-            <button type="submit" class="btn btn-success">添加</button>
-        </form>
-    </div>
+<div class="page-header">
+    <h1>📂 分类管理</h1>
+    <p>管理植物的一级和二级分类</p>
+</div>
 
-    <table class="data-table">
+<!-- 新增分类 -->
+<div class="detail-section" style="max-width:600px;margin-bottom:2rem;">
+    <h3>➕ 新增分类</h3>
+    <form method="post" action="{% url 'admin_category_add' %}">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>分类名称</label>
+                <input type="text" name="name" class="form-control" required placeholder="如：观赏植物">
+            </div>
+            <div class="form-group">
+                <label>上级分类</label>
+                <select name="parent" class="form-control">
+                    <option value="">-- 一级分类 --</option>
+                    {% for p in parents %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>排序（数字越小越靠前）</label>
+            <input type="number" name="sort_order" class="form-control" value="0" style="width:120px;">
+        </div>
+        <button type="submit" class="btn btn-primary">✅ 添加</button>
+    </form>
+</div>
+
+<!-- 分类列表 -->
+<div class="table-container">
+    <table>
         <thead>
-            <tr><th>ID</th><th>分类名称</th><th>图书数量</th><th>操作</th></tr>
+            <tr><th>ID</th><th>名称</th><th>上级</th><th>排序</th><th>创建时间</th><th>操作</th></tr>
         </thead>
         <tbody>
-            {% for cat in categories %}
+            {% for cat in all_categories %}
             <tr>
                 <td>{{ cat.id }}</td>
                 <td>
-                    <form method="post" action="{% url 'admin_category_edit' cat.id %}" class="inline-form" id="edit-form-{{ cat.id }}">
-                        {% csrf_token %}
-                        <input type="text" name="name" value="{{ cat.name }}" class="inline-edit">
-                    </form>
+                    {% if cat.parent %}└ {% endif %}<strong>{{ cat.name }}</strong>
                 </td>
-                <td>{{ cat.book_count }}</td>
-                <td class="action-cell">
-                    <button type="submit" form="edit-form-{{ cat.id }}" class="btn btn-sm btn-primary">保存</button>
-                    {% if cat.book_count == 0 %}
-                    <form method="post" action="{% url 'admin_category_delete' cat.id %}" style="display:inline">
+                <td>{{ cat.parent.name|default:"一级分类" }}</td>
+                <td>{{ cat.sort_order }}</td>
+                <td>{{ cat.create_time|date:"Y-m-d" }}</td>
+                <td>
+                    <form method="post" action="{% url 'admin_category_edit' cat.id %}" style="display:inline;">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('确认删除分类「{{ cat.name }}」？')">删除</button>
+                        <input type="text" name="name" value="{{ cat.name }}" class="form-control" style="width:100px;display:inline;padding:0.3rem 0.5rem;">
+                        <input type="number" name="sort_order" value="{{ cat.sort_order }}" class="form-control" style="width:60px;display:inline;padding:0.3rem 0.5rem;">
+                        <button type="submit" class="btn btn-outline btn-sm">保存</button>
                     </form>
-                    {% endif %}
+                    <a href="{% url 'admin_category_delete' cat.id %}" class="btn btn-danger btn-sm" onclick="return confirm('确定删除此分类？')">删除</a>
                 </td>
             </tr>
             {% empty %}
-            <tr><td colspan="4" class="empty-cell">暂无分类</td></tr>
+            <tr><td colspan="6" style="text-align:center;color:var(--text-light);padding:2rem;">暂无分类</td></tr>
             {% endfor %}
         </tbody>
     </table>

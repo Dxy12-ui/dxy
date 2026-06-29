@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}校园图书管理系统{% endblock %}</title>
+    <title>{% block title %}植物查询管理系统{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
     {% block extra_head %}{% endblock %}
 </head>
@@ -11,29 +11,29 @@
     <!-- 导航栏 -->
     <nav class="navbar">
         <div class="nav-container">
-            <a href="/" class="nav-brand">📚 校园图书管理系统</a>
+            <a href="{% url 'front_home' %}" class="nav-brand">
+                <span class="logo-icon">🌿</span> 植物查询管理系统
+            </a>
             {% if user.is_authenticated %}
             <div class="nav-links">
                 {% if user.role == "admin" %}
-                    <a href="{% url 'admin_dashboard' %}" class="nav-link">仪表盘</a>
-                    <a href="{% url 'admin_book_list' %}" class="nav-link">图书管理</a>
-                    <a href="{% url 'admin_category_list' %}" class="nav-link">分类管理</a>
-                    <a href="{% url 'admin_borrow_records' %}" class="nav-link">借阅记录</a>
-                    <a href="{% url 'admin_statistics' %}" class="nav-link">数据统计</a>
-                    <a href="{% url 'admin_user_list' %}" class="nav-link">用户管理</a>
+                    <a href="{% url 'admin_dashboard' %}" class="nav-link {% if '/manage/dashboard' in request.path %}active{% endif %}">📊 仪表盘</a>
+                    <a href="{% url 'admin_plant_list' %}" class="nav-link {% if '/manage/plants' in request.path %}active{% endif %}">🌱 植物管理</a>
+                    <a href="{% url 'admin_category_list' %}" class="nav-link {% if '/manage/categories' in request.path %}active{% endif %}">📂 分类管理</a>
+                    <a href="{% url 'admin_feedback_list' %}" class="nav-link {% if '/manage/feedbacks' in request.path %}active{% endif %}">📝 反馈审核</a>
+                    <a href="{% url 'admin_statistics' %}" class="nav-link {% if '/manage/statistics' in request.path %}active{% endif %}">📈 统计</a>
+                    <a href="{% url 'admin_operation_logs' %}" class="nav-link {% if '/manage/logs' in request.path %}active{% endif %}">📋 日志</a>
+                    <a href="{% url 'admin_user_list' %}" class="nav-link {% if '/manage/users' in request.path %}active{% endif %}">👥 用户</a>
                 {% else %}
-                    <a href="/" class="nav-link">图书浏览</a>
-                    <a href="{% url 'my_borrows' %}" class="nav-link">我的借阅</a>
+                    <a href="{% url 'front_home' %}" class="nav-link {% if request.path == '/' %}active{% endif %}">🏠 首页</a>
+                    <a href="{% url 'plant_image_search' %}" class="nav-link {% if '/image-search' in request.path %}active{% endif %}">📷 图片识图</a>
+                    <a href="{% url 'my_collections' %}" class="nav-link {% if '/my-collections' in request.path %}active{% endif %}">⭐ 我的收藏</a>
+                    <a href="{% url 'my_history' %}" class="nav-link {% if '/my-history' in request.path %}active{% endif %}">🕐 查询历史</a>
+                    <a href="{% url 'my_feedbacks' %}" class="nav-link {% if '/my-feedbacks' in request.path %}active{% endif %}">💬 我的反馈</a>
                 {% endif %}
-                <div class="nav-search">
-                    <form method="get" action="/">
-                        <input type="text" name="q" placeholder="搜索书名/作者/分类..." value="{{ search_query|default:'' }}">
-                        <button type="submit">搜索</button>
-                    </form>
-                </div>
-                <span class="nav-user">{{ user.username }}（{{ user.get_role_display }}）</span>
-                <a href="{% url 'profile' %}" class="nav-link">个人信息</a>
-                <a href="{% url 'logout' %}" class="nav-link nav-logout">退出</a>
+                <span class="nav-user">{{ user.username }}</span>
+                <a href="{% url 'profile' %}" class="nav-link">⚙️ 个人信息</a>
+                <a href="{% url 'logout' %}" class="nav-link nav-logout">🚪 退出</a>
             </div>
             {% endif %}
         </div>
@@ -55,10 +55,9 @@
 
     <!-- 页脚 -->
     <footer class="footer">
-        <p>&copy; 2024 校园图书管理系统 | Django 4.2</p>
+        <p>🌿 植物查询管理系统 &copy; 2024 | Python + Django + MySQL | 轻量化植物科普管理平台</p>
     </footer>
 
     {% block extra_scripts %}{% endblock %}
 </body>
 </html>
-

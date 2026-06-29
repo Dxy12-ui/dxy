@@ -1,24 +1,39 @@
 ﻿from django.contrib import admin
-from .models import Category, Book, BorrowRecord
+from .models import PlantCategory, PlantInfo, UserCollect, SearchHistory, PlantFeedback, OperationLog
 
 
-@admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ("id", "name")
-    search_fields = ("name",)
+@admin.register(PlantCategory)
+class PlantCategoryAdmin(admin.ModelAdmin):
+    list_display = ["id", "name", "parent", "sort_order"]
+    list_filter = ["parent"]
+    search_fields = ["name"]
 
 
-@admin.register(Book)
-class BookAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "author", "category", "stock", "total_num", "create_time")
-    list_filter = ("category",)
-    search_fields = ("title", "author")
-    ordering = ("-create_time",)
+@admin.register(PlantInfo)
+class PlantInfoAdmin(admin.ModelAdmin):
+    list_display = ["id", "name_cn", "category", "status", "view_count", "update_time"]
+    list_filter = ["status", "category", "is_toxic", "is_protected"]
+    search_fields = ["name_cn", "name_en", "alias"]
+    ordering = ["-update_time"]
 
 
-@admin.register(BorrowRecord)
-class BorrowRecordAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "book", "borrow_date", "return_date", "is_return")
-    list_filter = ("is_return",)
-    search_fields = ("user__username", "book__title")
-    ordering = ("-borrow_date",)
+@admin.register(UserCollect)
+class UserCollectAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "plant", "create_time"]
+
+
+@admin.register(SearchHistory)
+class SearchHistoryAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "keyword", "search_type", "create_time"]
+
+
+@admin.register(PlantFeedback)
+class PlantFeedbackAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "plant", "status", "create_time"]
+    list_filter = ["status"]
+
+
+@admin.register(OperationLog)
+class OperationLogAdmin(admin.ModelAdmin):
+    list_display = ["id", "user", "action", "target_type", "target_id", "create_time"]
+    list_filter = ["action"]

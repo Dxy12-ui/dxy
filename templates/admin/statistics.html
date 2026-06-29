@@ -1,133 +1,90 @@
 ﻿{% extends "base.html" %}
-{% block title %}借阅数据统计{% endblock %}
-{% block extra_head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-{% endblock %}
+{% block title %}数据统计 - 后台管理{% endblock %}
 {% block content %}
-<div class="admin-container">
-    <h2>📊 借阅数据统计</h2>
-    
-    <!-- 概览卡片 -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-number">{{ total_borrow_count }}</div>
-            <div class="stat-label">总借阅量</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-number">{{ active_borrow_count }}</div>
-            <div class="stat-label">当前借阅中</div>
+<div class="page-header">
+    <h1>📈 数据统计</h1>
+    <p>系统运营核心数据</p>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-icon green">🌱</div>
+        <div>
+            <div class="stat-value">{{ total_plants }}</div>
+            <div class="stat-label">植物总数</div>
         </div>
     </div>
-
-    <!-- 借阅趋势图 -->
-    <div class="chart-section">
-        <h3>📈 月度借阅趋势（近6个月）</h3>
-        <div class="chart-wrapper">
-            <canvas id="trendChart"></canvas>
+    <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div>
+            <div class="stat-value">{{ online_plants }}</div>
+            <div class="stat-label">已上线植物</div>
         </div>
     </div>
-
-    <!-- 热门图书 -->
-    <div class="chart-section">
-        <h3>🔥 图书借阅热度 Top 20</h3>
-        <div class="chart-wrapper">
-            <canvas id="hotBooksChart"></canvas>
+    <div class="stat-card">
+        <div class="stat-icon blue">👥</div>
+        <div>
+            <div class="stat-value">{{ total_users }}</div>
+            <div class="stat-label">注册用户</div>
         </div>
     </div>
-
-    <!-- 学生借阅统计 -->
-    <div class="chart-section">
-        <h3>👤 学生借阅排行 Top 20</h3>
-        <div class="chart-wrapper">
-            <canvas id="studentChart"></canvas>
+    <div class="stat-card">
+        <div class="stat-icon green">👁</div>
+        <div>
+            <div class="stat-value">{{ total_views }}</div>
+            <div class="stat-label">总浏览量</div>
         </div>
     </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">⭐</div>
+        <div>
+            <div class="stat-value">{{ total_collects }}</div>
+            <div class="stat-label">总收藏数</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon red">💬</div>
+        <div>
+            <div class="stat-value">{{ total_feedbacks }}</div>
+            <div class="stat-label">纠错反馈</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">⏳</div>
+        <div>
+            <div class="stat-value">{{ pending_feedbacks }}</div>
+            <div class="stat-label">待审核反馈</div>
+        </div>
+    </div>
+</div>
 
-    <!-- 库存预警 -->
-    <div class="dashboard-section">
-        <h3>⚠️ 库存预警（库存 ≤ 3）</h3>
-        {% if low_stock %}
-        <table class="data-table">
+<!-- 分类分布 -->
+<div class="detail-section">
+    <h3>📊 分类植物分布（Top 10）</h3>
+    <div class="table-container">
+        <table>
             <thead>
-                <tr><th>书名</th><th>作者</th><th>当前库存</th><th>总入库</th></tr>
+                <tr><th>分类名称</th><th>植物数量</th><th>占比</th></tr>
             </thead>
             <tbody>
-                {% for book in low_stock %}
-                <tr {% if book.stock == 0 %}class="danger"{% endif %}>
-                    <td>{{ book.title }}</td>
-                    <td>{{ book.author }}</td>
-                    <td><strong>{{ book.stock }}</strong></td>
-                    <td>{{ book.total_num }}</td>
+                {% for cs in category_stats %}
+                <tr>
+                    <td>{{ cs.name }}</td>
+                    <td><strong>{{ cs.plant_count }}</strong></td>
+                    <td>
+                        <div style="background:var(--accent-light);border-radius:10px;height:8px;width:200px;display:inline-block;vertical-align:middle;">
+                            <div style="background:var(--primary);height:100%;border-radius:10px;width:{% widthratio cs.plant_count total_plants 100 %}%;"></div>
+                        </div>
+                        <span style="margin-left:0.5rem;font-size:0.85rem;">
+                            {% if total_plants > 0 %}{% widthratio cs.plant_count total_plants 100 %}{% else %}0{% endif %}%
+                        </span>
+                    </td>
                 </tr>
+                {% empty %}
+                <tr><td colspan="3" style="text-align:center;color:var(--text-light);">暂无数据</td></tr>
                 {% endfor %}
             </tbody>
         </table>
-        {% else %}
-        <p>✅ 所有图书库存充足</p>
-        {% endif %}
     </div>
 </div>
-{% endblock %}
-{% block extra_scripts %}
-<script>
-// 月度趋势图
-var trendCtx = document.getElementById("trendChart").getContext("2d");
-new Chart(trendCtx, {
-    type: "bar",
-    data: {
-        labels: {{ monthly_labels_json|safe }},
-        datasets: [{
-            label: "借阅量",
-            data: {{ monthly_counts_json|safe }},
-            backgroundColor: "#4a90d9",
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-    }
-});
-
-// 热门图书
-var hotData = {{ hot_books_json|safe }};
-var hotCtx = document.getElementById("hotBooksChart").getContext("2d");
-new Chart(hotCtx, {
-    type: "bar",
-    data: {
-        labels: hotData.map(function(d) { return d.title; }),
-        datasets: [{
-            label: "借阅次数",
-            data: hotData.map(function(d) { return d.count; }),
-            backgroundColor: "#e17055",
-        }]
-    },
-    options: {
-        indexAxis: "y",
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
-    }
-});
-
-// 学生借阅统计
-var studentData = {{ student_stats_json|safe }};
-var studentCtx = document.getElementById("studentChart").getContext("2d");
-new Chart(studentCtx, {
-    type: "bar",
-    data: {
-        labels: studentData.map(function(d) { return d.username; }),
-        datasets: [{
-            label: "借阅总量",
-            data: studentData.map(function(d) { return d.count; }),
-            backgroundColor: "#00b894",
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-    }
-});
-</script>
 {% endblock %}

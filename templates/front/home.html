@@ -1,0 +1,154 @@
+﻿{% extends "base.html" %}
+{% block title %}首页 - 植物查询管理系统{% endblock %}
+{% block content %}
+
+<!-- 搜索区域 -->
+<div class="search-section">
+    <h2>🌿 探索植物世界</h2>
+    <p>文字搜索、图片识别，快速查询植物信息</p>
+    <div class="search-tabs">
+        <span class="search-tab active" onclick="switchTab('text')">🔍 文字搜索</span>
+        <span class="search-tab" onclick="switchTab('image')">📷 图片识别</span>
+    </div>
+    <div id="tab-text">
+        <form method="get" action="{% url 'plant_search' %}">
+            <div class="search-box">
+                <input type="text" name="q" placeholder="输入植物名称、拉丁学名或别名...">
+                <button type="submit">🔍 搜 索</button>
+            </div>
+        </form>
+    </div>
+    <div id="tab-image" style="display:none;">
+        <form method="get" action="{% url 'plant_image_search' %}">
+            <div class="search-box">
+                <input type="text" placeholder="点击跳转图片识别页面..." readonly style="cursor:pointer;" onclick="location.href='{% url 'plant_image_search' %}'">
+                <button type="button" onclick="location.href='{% url 'plant_image_search' %}'">📷 开始识别</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 统计数据 -->
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-icon green">🌱</div>
+        <div>
+            <div class="stat-value">{{ plant_count }}</div>
+            <div class="stat-label">收录植物</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue">📂</div>
+        <div>
+            <div class="stat-value">{{ category_count }}</div>
+            <div class="stat-label">分类数量</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">👥</div>
+        <div>
+            <div class="stat-value">{{ user_count }}</div>
+            <div class="stat-label">注册用户</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon red">🔍</div>
+        <div>
+            <div class="stat-value">24h</div>
+            <div class="stat-label">全天可查</div>
+        </div>
+    </div>
+</div>
+
+<!-- 热门分类 -->
+{% if hot_categories %}
+<div class="section-title">
+    <span>📂 热门分类</span>
+    <a href="{% url 'plant_search' %}" class="more">查看全部 →</a>
+</div>
+<div class="category-grid">
+    {% for cat in hot_categories %}
+    <a href="{% url 'plant_search' %}?category={{ cat.id }}" class="category-item">
+        🌿 {{ cat.name }}
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- 热门植物 -->
+<div class="section-title">
+    <span>🔥 热门植物</span>
+    <a href="{% url 'plant_search' %}?sort=hot" class="more">更多 →</a>
+</div>
+<div class="plant-grid">
+    {% for plant in hot_plants %}
+    <a href="{% url 'plant_detail' plant.id %}" class="card" style="display:block;">
+        {% if plant.cover_image %}
+        <img src="{{ plant.cover_image.url }}" alt="{{ plant.name_cn }}" class="card-img">
+        {% else %}
+        <div class="card-img" style="display:flex;align-items:center;justify-content:center;font-size:3rem;">🌿</div>
+        {% endif %}
+        <div class="card-body">
+            <div class="card-title">{{ plant.name_cn }}</div>
+            {% if plant.name_en %}
+            <div class="card-text" style="font-style:italic;">{{ plant.name_en }}</div>
+            {% endif %}
+            <div class="card-meta">
+                {% if plant.category %}<span>📂 {{ plant.category.name }}</span>{% endif %}
+                <span>👁 {{ plant.view_count }}</span>
+                <span>⭐ {{ plant.collect_count }}</span>
+            </div>
+        </div>
+    </a>
+    {% empty %}
+    <div class="empty-state" style="grid-column:1/-1;">
+        <div class="empty-icon">🌱</div>
+        <p>暂无植物数据，等待管理员录入</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 最新录入 -->
+<div class="section-title" style="margin-top:2rem;">
+    <span>🆕 最新录入</span>
+    <a href="{% url 'plant_search' %}?sort=create_time" class="more">更多 →</a>
+</div>
+<div class="plant-grid">
+    {% for plant in new_plants %}
+    <a href="{% url 'plant_detail' plant.id %}" class="card" style="display:block;">
+        {% if plant.cover_image %}
+        <img src="{{ plant.cover_image.url }}" alt="{{ plant.name_cn }}" class="card-img">
+        {% else %}
+        <div class="card-img" style="display:flex;align-items:center;justify-content:center;font-size:3rem;">🌱</div>
+        {% endif %}
+        <div class="card-body">
+            <div class="card-title">{{ plant.name_cn }}</div>
+            <div class="card-meta">
+                {% if plant.category %}<span>📂 {{ plant.category.name }}</span>{% endif %}
+                <span>📅 {{ plant.create_time|date:"m-d" }}</span>
+            </div>
+        </div>
+    </a>
+    {% empty %}
+    <div class="empty-state" style="grid-column:1/-1;">
+        <div class="empty-icon">📦</div>
+        <p>暂无新录入植物</p>
+    </div>
+    {% endfor %}
+</div>
+
+{% endblock %}
+{% block extra_scripts %}
+<script>
+function switchTab(tab) {
+    document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-text').style.display = tab === 'text' ? 'block' : 'none';
+    document.getElementById('tab-image').style.display = tab === 'image' ? 'block' : 'none';
+    document.querySelectorAll('.search-tab').forEach(t => {
+        if ((tab === 'text' && t.textContent.includes('文字')) || (tab === 'image' && t.textContent.includes('图片'))) {
+            t.classList.add('active');
+        }
+    });
+}
+</script>
+{% endblock %}

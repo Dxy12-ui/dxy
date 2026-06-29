@@ -1,0 +1,109 @@
+﻿{% extends "base.html" %}
+{% block title %}植物管理 - 后台管理{% endblock %}
+{% block content %}
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+    <div>
+        <h1>🌱 植物管理</h1>
+        <p>管理所有植物数据</p>
+    </div>
+    <a href="{% url 'admin_plant_add' %}" class="btn btn-primary">➕ 新增植物</a>
+</div>
+
+<!-- 筛选 -->
+<form method="get" class="filter-bar">
+    <input type="text" name="q" class="form-control" placeholder="搜索植物名称..." value="{{ search }}" style="min-width:200px;">
+    <select name="status" class="form-control">
+        <option value="">全部状态</option>
+        {% for val,label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="category" class="form-control">
+        <option value="">全部分类</option>
+        {% for cat in categories %}
+        <option value="{{ cat.id }}" {% if category_filter == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+    {% if search or status_filter or category_filter %}
+    <a href="{% url 'admin_plant_list' %}" class="btn btn-outline btn-sm">清除</a>
+    {% endif %}
+</form>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>封面</th>
+                <th>名称</th>
+                <th>分类</th>
+                <th>状态</th>
+                <th>浏览/收藏</th>
+                <th>更新时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for plant in plants %}
+            <tr>
+                <td>{{ plant.id }}</td>
+                <td>
+                    {% if plant.cover_image %}
+                    <img src="{{ plant.cover_image.url }}" style="width:50px;height:40px;object-fit:cover;border-radius:6px;">
+                    {% else %}
+                    <span style="font-size:1.5rem;">🌿</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <strong>{{ plant.name_cn }}</strong>
+                    {% if plant.name_en %}<br><small style="color:var(--text-light);font-style:italic;">{{ plant.name_en }}</small>{% endif %}
+                </td>
+                <td>{{ plant.category.name|default:"-" }}</td>
+                <td><span class="tag tag-status-{{ plant.status }}">{{ plant.get_status_display }}</span></td>
+                <td>👁{{ plant.view_count }} ⭐{{ plant.collect_count }}</td>
+                <td>{{ plant.update_time|date:"m-d H:i" }}</td>
+                <td style="white-space:nowrap;">
+                    <a href="{% url 'admin_plant_edit' plant.id %}" class="btn btn-outline btn-sm">✏️</a>
+                    <a href="{% url 'admin_plant_delete' plant.id %}" class="btn btn-danger btn-sm" onclick="return confirm('确定下架该植物？')">🗑</a>
+                    {% if plant.status != 'online' %}
+                    <form method="post" action="{% url 'admin_plant_status' plant.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="online">
+                        <button type="submit" class="btn btn-success btn-sm">上线</button>
+                    </form>
+                    {% endif %}
+                    {% if plant.status == 'online' %}
+                    <form method="post" action="{% url 'admin_plant_status' plant.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="status" value="offline">
+                        <button type="submit" class="btn btn-warning btn-sm">下架</button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="8" style="text-align:center;color:var(--text-light);padding:2rem;">暂无植物数据</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if plants.has_other_pages %}
+<div class="pagination">
+    {% if plants.has_previous %}
+    <a href="?q={{ search }}&status={{ status_filter }}&category={{ category_filter }}&page={{ plants.previous_page_number }}">上一页</a>
+    {% endif %}
+    {% for num in plants.paginator.page_range %}
+        {% if num == plants.number %}
+        <span class="current">{{ num }}</span>
+        {% elif num > plants.number|add:"-3" and num < plants.number|add:"3" %}
+        <a href="?q={{ search }}&status={{ status_filter }}&category={{ category_filter }}&page={{ num }}">{{ num }}</a>
+        {% endif %}
+    {% endfor %}
+    {% if plants.has_next %}
+    <a href="?q={{ search }}&status={{ status_filter }}&category={{ category_filter }}&page={{ plants.next_page_number }}">下一页</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

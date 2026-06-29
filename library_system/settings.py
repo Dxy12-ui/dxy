@@ -3,20 +3,11 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ===== 安全密钥（Railway 环境变量优先）=====
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY",
-    "django-insecure-lib-sys-2024-secret-key-change-in-prod",
-)
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-plant-system-2024-secret-key")
 
-# ===== 调试模式（生产环境自动关闭）=====
-DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "yes")
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "yes")
 
-# ===== 允许的主机 =====
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
-railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
-if railway_domain and railway_domain not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(railway_domain)
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -25,14 +16,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "whitenoise.runserver_nostatic",
     "accounts",
     "library",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -61,17 +50,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "library_system.wsgi.application"
 
-# ===== 数据库配置 =====
-# Railway 自动注入 DATABASE_URL（PostgreSQL），本地开发使用 SQLite
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
-if DATABASE_URL:
-    import dj_database_url
+# ===== 数据库配置（MySQL优先，开发可用SQLite）=====
+DB_ENGINE = os.environ.get("DB_ENGINE", "sqlite3")
+if DB_ENGINE == "mysql":
     DATABASES = {
-        "default": dj_database_url.config(
-            default=DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": os.environ.get("DB_NAME", "plant_system"),
+            "USER": os.environ.get("DB_USER", "root"),
+            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+            "HOST": os.environ.get("DB_HOST", "127.0.0.1"),
+            "PORT": os.environ.get("DB_PORT", "3306"),
+            "OPTIONS": {"charset": "utf8mb4"},
+        }
     }
 else:
     DATABASES = {
@@ -82,10 +73,7 @@ else:
     }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 LANGUAGE_CODE = "zh-hans"
@@ -93,11 +81,9 @@ TIME_ZONE = "Asia/Shanghai"
 USE_I18N = True
 USE_TZ = True
 
-# ===== 静态文件（Whitenoise）=====
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -108,19 +94,14 @@ LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/login/"
 SESSION_COOKIE_AGE = 86400
 
-# ===== 生产环境安全（DEBUG=False 时生效）=====
-if not DEBUG:
-    CSRF_TRUSTED_ORIGINS = [
-        o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o
-    ]
-    if railway_domain:
-        CSRF_TRUSTED_ORIGINS.append(f"https://{railway_domain}")
+# ===== 媒体文件上传 =====
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+# ===== 图片识图API配置 =====
+PLANT_API_KEY = os.environ.get("PLANT_API_KEY", "")
+PLANT_API_URL = os.environ.get("PLANT_API_URL", "https://api.plant.id/v3/identification")
 
-
+# ===== 文件上传限制 =====
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024

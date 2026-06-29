@@ -1,0 +1,105 @@
+﻿{% extends "base.html" %}
+{% block title %}搜索 - 植物查询管理系统{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>🔍 植物查询</h1>
+    <p>通过文字描述快速找到您想要的植物信息</p>
+</div>
+
+<!-- 搜索框 -->
+<form method="get" action="{% url 'plant_search' %}">
+    <div class="search-box" style="border-radius:12px;margin-bottom:1rem;max-width:100%;">
+        <input type="text" name="q" value="{{ query }}" placeholder="输入植物名称、拉丁学名或别名...">
+        <button type="submit">🔍 搜索</button>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="filter-bar">
+        <select name="category" class="form-control">
+            <option value="">📂 全部分类</option>
+            {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if category_id == cat.id|stringformat:"s" %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+        <select name="is_toxic" class="form-control">
+            <option value="">⚠️ 毒性（全部）</option>
+            <option value="1" {% if is_toxic == "1" %}selected{% endif %}>有毒</option>
+            <option value="0" {% if is_toxic == "0" %}selected{% endif %}>无毒</option>
+        </select>
+        <select name="is_protected" class="form-control">
+            <option value="">🛡 保护（全部）</option>
+            <option value="1" {% if is_protected == "1" %}selected{% endif %}>保护植物</option>
+            <option value="0" {% if is_protected == "0" %}selected{% endif %}>非保护</option>
+        </select>
+        <select name="sort" class="form-control">
+            <option value="update_time" {% if sort == "update_time" %}selected{% endif %}>🕐 最新更新</option>
+            <option value="hot" {% if sort == "hot" %}selected{% endif %}>🔥 最热门</option>
+            <option value="create_time" {% if sort == "create_time" %}selected{% endif %}>📅 最新录入</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+        {% if query or category_id or is_toxic or is_protected %}
+        <a href="{% url 'plant_search' %}" class="btn btn-outline btn-sm">清除筛选</a>
+        {% endif %}
+    </div>
+</form>
+
+<!-- 结果 -->
+{% if query %}
+<p style="margin-bottom:1rem;color:var(--text-light);">
+    搜索 "<strong>{{ query }}</strong>" 共找到 <strong>{{ plants.paginator.count }}</strong> 个结果
+</p>
+{% endif %}
+
+<div class="plant-grid">
+    {% for plant in plants %}
+    <a href="{% url 'plant_detail' plant.id %}" class="card" style="display:block;">
+        {% if plant.cover_image %}
+        <img src="{{ plant.cover_image.url }}" alt="{{ plant.name_cn }}" class="card-img">
+        {% else %}
+        <div class="card-img" style="display:flex;align-items:center;justify-content:center;font-size:3rem;">🌿</div>
+        {% endif %}
+        <div class="card-body">
+            <div class="card-title">{{ plant.name_cn }}</div>
+            {% if plant.name_en %}
+            <div class="card-text" style="font-style:italic;">{{ plant.name_en }}</div>
+            {% endif %}
+            <div class="card-meta">
+                {% if plant.category %}<span class="tag tag-category">{{ plant.category.name }}</span>{% endif %}
+                {% if plant.is_toxic %}<span class="tag tag-toxic">有毒</span>{% endif %}
+                {% if plant.is_protected %}<span class="tag tag-protected">保护</span>{% endif %}
+            </div>
+            <div class="card-meta" style="margin-top:0.4rem;">
+                <span>👁 {{ plant.view_count }}</span>
+                <span>⭐ {{ plant.collect_count }}</span>
+                <span>📅 {{ plant.update_time|date:"Y-m-d" }}</span>
+            </div>
+        </div>
+    </a>
+    {% empty %}
+    <div class="empty-state" style="grid-column:1/-1;">
+        <div class="empty-icon">🔍</div>
+        <p>未找到匹配的植物，试试其他关键词吧</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 分页 -->
+{% if plants.has_other_pages %}
+<div class="pagination">
+    {% if plants.has_previous %}
+    <a href="?q={{ query }}&category={{ category_id }}&is_toxic={{ is_toxic }}&is_protected={{ is_protected }}&sort={{ sort }}&page={{ plants.previous_page_number }}">上一页</a>
+    {% endif %}
+    {% for num in plants.paginator.page_range %}
+        {% if num == plants.number %}
+        <span class="current">{{ num }}</span>
+        {% elif num > plants.number|add:"-3" and num < plants.number|add:"3" %}
+        <a href="?q={{ query }}&category={{ category_id }}&is_toxic={{ is_toxic }}&is_protected={{ is_protected }}&sort={{ sort }}&page={{ num }}">{{ num }}</a>
+        {% endif %}
+    {% endfor %}
+    {% if plants.has_next %}
+    <a href="?q={{ query }}&category={{ category_id }}&is_toxic={{ is_toxic }}&is_protected={{ is_protected }}&sort={{ sort }}&page={{ plants.next_page_number }}">下一页</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

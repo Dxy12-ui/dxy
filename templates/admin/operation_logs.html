@@ -1,0 +1,55 @@
+﻿{% extends "base.html" %}
+{% block title %}操作日志 - 后台管理{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📋 操作日志</h1>
+    <p>管理员所有操作记录，可追溯</p>
+</div>
+
+<div class="filter-bar">
+    <a href="?" class="btn btn-sm {% if not action_filter %}btn-primary{% else %}btn-outline{% endif %}">全部</a>
+    {% for val,label in action_choices %}
+    <a href="?action={{ val }}" class="btn btn-sm {% if action_filter == val %}btn-primary{% else %}btn-outline{% endif %}">{{ label }}</a>
+    {% endfor %}
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>操作者</th><th>操作类型</th><th>对象</th><th>详情</th><th>IP</th><th>时间</th></tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.user.username|default:"系统" }}</td>
+                <td><span class="tag tag-category">{{ log.get_action_display }}</span></td>
+                <td>{{ log.target_type }}{% if log.target_id %}#{{ log.target_id }}{% endif %}</td>
+                <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ log.detail|default:"-" }}</td>
+                <td>{{ log.ip_address|default:"-" }}</td>
+                <td>{{ log.create_time|date:"Y-m-d H:i:s" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" style="text-align:center;color:var(--text-light);padding:2rem;">暂无操作记录</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if logs.has_other_pages %}
+<div class="pagination">
+    {% if logs.has_previous %}
+    <a href="?action={{ action_filter }}&page={{ logs.previous_page_number }}">上一页</a>
+    {% endif %}
+    {% for num in logs.paginator.page_range %}
+        {% if num == logs.number %}
+        <span class="current">{{ num }}</span>
+        {% elif num > logs.number|add:"-3" and num < logs.number|add:"3" %}
+        <a href="?action={{ action_filter }}&page={{ num }}">{{ num }}</a>
+        {% endif %}
+    {% endfor %}
+    {% if logs.has_next %}
+    <a href="?action={{ action_filter }}&page={{ logs.next_page_number }}">下一页</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

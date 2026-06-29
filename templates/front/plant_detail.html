@@ -1,0 +1,168 @@
+﻿{% extends "base.html" %}
+{% block title %}{{ plant.name_cn }} - 植物详情{% endblock %}
+{% block content %}
+
+<div class="detail-header">
+    {% if plant.cover_image %}
+    <img src="{{ plant.cover_image.url }}" alt="{{ plant.name_cn }}" class="detail-img">
+    {% else %}
+    <div class="detail-img" style="display:flex;align-items:center;justify-content:center;font-size:5rem;background:var(--accent-light);">🌿</div>
+    {% endif %}
+    <div class="detail-info">
+        <h1>{{ plant.name_cn }}</h1>
+        {% if plant.name_en %}
+        <div class="latin-name">📖 {{ plant.name_en }}</div>
+        {% endif %}
+        {% if plant.alias %}
+        <p style="color:var(--text-light);margin-bottom:0.5rem;">别名：{{ plant.alias }}</p>
+        {% endif %}
+
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+            {% if plant.category %}
+            <span class="tag tag-category">📂 {{ plant.category.name }}</span>
+            {% endif %}
+            {% if plant.is_toxic %}
+            <span class="tag tag-toxic">⚠️ 有毒</span>
+            {% else %}
+            <span class="tag tag-safe">✅ 无毒</span>
+            {% endif %}
+            {% if plant.is_protected %}
+            <span class="tag tag-protected">🛡 保护植物{% if plant.protection_level %}({{ plant.protection_level }}){% endif %}</span>
+            {% endif %}
+            {% if plant.status != 'online' %}
+            <span class="tag tag-status-{{ plant.status }}">{{ plant.get_status_display }}</span>
+            {% endif %}
+        </div>
+
+        <div class="card-meta" style="margin-bottom:1rem;">
+            <span>👁 {{ plant.view_count }} 次浏览</span>
+            <span>⭐ {{ plant.collect_count }} 次收藏</span>
+            <span>📅 更新于 {{ plant.update_time|date:"Y-m-d" }}</span>
+        </div>
+
+        <div class="detail-actions">
+            {% if user.is_authenticated %}
+            <button class="btn {% if is_collected %}btn-warning{% else %}btn-outline{% endif %}" id="collectBtn" onclick="toggleCollect({{ plant.id }})">
+                {% if is_collected %}⭐ 已收藏{% else %}☆ 收藏{% endif %}
+            </button>
+            {% endif %}
+            <button class="btn btn-outline" onclick="document.getElementById('feedbackForm').scrollIntoView({behavior:'smooth'})">
+                📝 信息纠错
+            </button>
+            {% if user.role == 'admin' %}
+            <a href="{% url 'admin_plant_edit' plant.id %}" class="btn btn-primary btn-sm">✏️ 编辑</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 科普信息 -->
+{% if plant.morphology %}
+<div class="detail-section">
+    <h3>🌿 形态特征</h3>
+    <p>{{ plant.morphology|linebreaksbr }}</p>
+</div>
+{% endif %}
+
+{% if plant.habitat %}
+<div class="detail-section">
+    <h3>🌍 生长习性</h3>
+    <p>{{ plant.habitat|linebreaksbr }}</p>
+</div>
+{% endif %}
+
+{% if plant.cultivation %}
+<div class="detail-section">
+    <h3>🪴 栽培养护</h3>
+    <p>{{ plant.cultivation|linebreaksbr }}</p>
+</div>
+{% endif %}
+
+{% if plant.value_desc %}
+<div class="detail-section">
+    <h3>💎 主要价值</h3>
+    <p>{{ plant.value_desc|linebreaksbr }}</p>
+</div>
+{% endif %}
+
+{% if plant.is_toxic and plant.toxicity_desc %}
+<div class="detail-section" style="border-left:4px solid var(--danger);">
+    <h3 style="color:var(--danger);">⚠️ 毒性说明</h3>
+    <p>{{ plant.toxicity_desc|linebreaksbr }}</p>
+</div>
+{% endif %}
+
+<!-- 更多图片 -->
+{% if plant.image_list %}
+<div class="detail-section">
+    <h3>🖼 更多图片</h3>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+        {% for img in plant.image_list %}
+        <img src="/media/{{ img }}" style="width:150px;height:120px;object-fit:cover;border-radius:8px;" alt="植物图片">
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- 纠错反馈 -->
+<div class="detail-section" id="feedbackForm">
+    <h3>📝 信息纠错</h3>
+    {% if user.is_authenticated %}
+    <form method="post" action="{% url 'submit_feedback' plant.id %}">
+        {% csrf_token %}
+        <div class="form-group">
+            <label>纠错内容</label>
+            <textarea name="content" class="form-control" rows="3" placeholder="请描述您发现的错误信息..." required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">📤 提交纠错</button>
+    </form>
+    {% else %}
+    <p style="color:var(--text-light);">请<a href="{% url 'login' %}">登录</a>后提交纠错反馈</p>
+    {% endif %}
+</div>
+
+<!-- 相关植物 -->
+{% if related_plants %}
+<div class="section-title" style="margin-top:2rem;">
+    <span>🌱 相关植物</span>
+</div>
+<div class="plant-grid">
+    {% for rp in related_plants %}
+    <a href="{% url 'plant_detail' rp.id %}" class="card" style="display:block;">
+        {% if rp.cover_image %}
+        <img src="{{ rp.cover_image.url }}" alt="{{ rp.name_cn }}" class="card-img">
+        {% else %}
+        <div class="card-img" style="display:flex;align-items:center;justify-content:center;font-size:3rem;">🌿</div>
+        {% endif %}
+        <div class="card-body">
+            <div class="card-title">{{ rp.name_cn }}</div>
+            {% if rp.name_en %}<div class="card-text" style="font-style:italic;">{{ rp.name_en }}</div>{% endif %}
+            <div class="card-meta">
+                <span>👁 {{ rp.view_count }}</span>
+                <span>⭐ {{ rp.collect_count }}</span>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
+{% block extra_scripts %}
+<script>
+function toggleCollect(plantId) {
+    fetch('/plant/' + plantId + '/collect/', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+        .then(r => r.json())
+        .then(data => {
+            var btn = document.getElementById('collectBtn');
+            if (data.status === 'collected') {
+                btn.className = 'btn btn-warning';
+                btn.textContent = '⭐ 已收藏 (' + data.count + ')';
+            } else {
+                btn.className = 'btn btn-outline';
+                btn.textContent = '☆ 收藏 (' + data.count + ')';
+            }
+        });
+}
+</script>
+{% endblock %}

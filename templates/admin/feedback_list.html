@@ -1,0 +1,80 @@
+﻿{% extends "base.html" %}
+{% block title %}反馈审核 - 后台管理{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>📝 反馈审核</h1>
+    <p>审核用户提交的植物信息纠错反馈</p>
+</div>
+
+<div class="filter-bar">
+    <a href="?status=" class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline{% endif %}">全部</a>
+    <a href="?status=pending" class="btn btn-sm {% if status_filter == 'pending' %}btn-primary{% else %}btn-outline{% endif %}">待审核</a>
+    <a href="?status=approved" class="btn btn-sm {% if status_filter == 'approved' %}btn-primary{% else %}btn-outline{% endif %}">已采纳</a>
+    <a href="?status=rejected" class="btn btn-sm {% if status_filter == 'rejected' %}btn-primary{% else %}btn-outline{% endif %}">已驳回</a>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr><th>用户</th><th>相关植物</th><th>纠错内容</th><th>状态</th><th>提交时间</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+            {% for fb in feedbacks %}
+            <tr>
+                <td>{{ fb.user.username }}</td>
+                <td><a href="{% url 'plant_detail' fb.plant.id %}">{{ fb.plant.name_cn }}</a></td>
+                <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ fb.content }}</td>
+                <td>
+                    {% if fb.status == "pending" %}
+                    <span class="tag tag-status-pending">待审核</span>
+                    {% elif fb.status == "approved" %}
+                    <span class="tag tag-status-online">已采纳</span>
+                    {% else %}
+                    <span class="tag tag-status-offline">已驳回</span>
+                    {% endif %}
+                </td>
+                <td>{{ fb.create_time|date:"m-d H:i" }}</td>
+                <td style="white-space:nowrap;">
+                    {% if fb.status == "pending" %}
+                    <form method="post" action="{% url 'admin_feedback_review' fb.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="approve">
+                        <input type="text" name="reply" placeholder="回复（可选）" class="form-control" style="width:120px;display:inline;padding:0.3rem;">
+                        <button type="submit" class="btn btn-success btn-sm">采纳</button>
+                    </form>
+                    <form method="post" action="{% url 'admin_feedback_review' fb.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="reject">
+                        <input type="text" name="reply" placeholder="驳回原因 *" class="form-control" style="width:120px;display:inline;padding:0.3rem;" required>
+                        <button type="submit" class="btn btn-danger btn-sm">驳回</button>
+                    </form>
+                    {% else %}
+                    <span style="color:var(--text-light);">{{ fb.reply|default:"-" }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" style="text-align:center;color:var(--text-light);padding:2rem;">暂无反馈</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if feedbacks.has_other_pages %}
+<div class="pagination">
+    {% if feedbacks.has_previous %}
+    <a href="?status={{ status_filter }}&page={{ feedbacks.previous_page_number }}">上一页</a>
+    {% endif %}
+    {% for num in feedbacks.paginator.page_range %}
+        {% if num == feedbacks.number %}
+        <span class="current">{{ num }}</span>
+        {% elif num > feedbacks.number|add:"-3" and num < feedbacks.number|add:"3" %}
+        <a href="?status={{ status_filter }}&page={{ num }}">{{ num }}</a>
+        {% endif %}
+    {% endfor %}
+    {% if feedbacks.has_next %}
+    <a href="?status={{ status_filter }}&page={{ feedbacks.next_page_number }}">下一页</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

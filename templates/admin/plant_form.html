@@ -1,0 +1,103 @@
+﻿{% extends "base.html" %}
+{% block title %}{% if is_edit %}编辑植物{% else %}新增植物{% endif %} - 后台管理{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h1>{% if is_edit %}✏️ 编辑植物{% else %}➕ 新增植物{% endif %}</h1>
+    <p>{% if is_edit %}修改「{{ plant.name_cn }}」的信息{% else %}录入新的植物数据{% endif %}</p>
+</div>
+
+<div class="detail-section" style="max-width:900px;">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-group">
+                <label>中文名称 *</label>
+                <input type="text" name="name_cn" class="form-control" value="{{ plant.name_cn|default:'' }}" required>
+            </div>
+            <div class="form-group">
+                <label>拉丁学名</label>
+                <input type="text" name="name_en" class="form-control" value="{{ plant.name_en|default:'' }}" placeholder="如：Rosa chinensis">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>别名（逗号分隔）</label>
+            <input type="text" name="alias" class="form-control" value="{{ plant.alias|default:'' }}" placeholder="如：月月红,长春花">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>所属分类</label>
+                <select name="category" class="form-control">
+                    <option value="">-- 请选择 --</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if plant.category.id == cat.id %}selected{% endif %}>
+                        {% if cat.parent %}&nbsp;&nbsp;└ {% endif %}{{ cat.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>状态</label>
+                <select name="status" class="form-control">
+                    <option value="draft" {% if plant.status == 'draft' %}selected{% endif %}>草稿</option>
+                    <option value="pending" {% if plant.status == 'pending' %}selected{% endif %}>待审核</option>
+                    <option value="online" {% if plant.status == 'online' %}selected{% endif %}>已上线</option>
+                    <option value="offline" {% if plant.status == 'offline' %}selected{% endif %}>已下架</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>形态特征</label>
+            <textarea name="morphology" class="form-control" rows="4" placeholder="描述植物的形态特征...">{{ plant.morphology|default:'' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>生长习性</label>
+            <textarea name="habitat" class="form-control" rows="3" placeholder="描述生长环境、习性...">{{ plant.habitat|default:'' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>栽培养护</label>
+            <textarea name="cultivation" class="form-control" rows="3" placeholder="栽培要点、养护方法...">{{ plant.cultivation|default:'' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>主要价值</label>
+            <textarea name="value_desc" class="form-control" rows="3" placeholder="药用、观赏、经济等价值...">{{ plant.value_desc|default:'' }}</textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-check">
+                <input type="checkbox" name="is_toxic" id="is_toxic" {% if plant.is_toxic %}checked{% endif %}>
+                <label for="is_toxic">是否有毒</label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" name="is_protected" id="is_protected" {% if plant.is_protected %}checked{% endif %}>
+                <label for="is_protected">是否保护植物</label>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>毒性说明</label>
+                <textarea name="toxicity_desc" class="form-control" rows="2" placeholder="如有毒，请说明...">{{ plant.toxicity_desc|default:'' }}</textarea>
+            </div>
+            <div class="form-group">
+                <label>保护级别</label>
+                <input type="text" name="protection_level" class="form-control" value="{{ plant.protection_level|default:'' }}" placeholder="如：国家一级保护">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>封面图片</label>
+            {% if plant.cover_image %}
+            <div style="margin-bottom:0.5rem;">
+                <img src="{{ plant.cover_image.url }}" style="width:150px;height:120px;object-fit:cover;border-radius:8px;">
+            </div>
+            {% endif %}
+            <input type="file" name="cover_image" class="form-control" accept=".jpg,.jpeg,.png">
+        </div>
+
+        <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
+            <button type="submit" class="btn btn-primary">💾 保存</button>
+            <a href="{% url 'admin_plant_list' %}" class="btn btn-outline">返回列表</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
