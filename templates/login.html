@@ -1,15 +1,21 @@
 ﻿{% extends "base.html" %}
 {% block title %}登录 - 植物查询管理系统{% endblock %}
 {% block extra_head %}
-<style>
-    .navbar, .footer { display: none; }
-</style>
+<style>.navbar, .footer { display: none; }</style>
 {% endblock %}
 {% block content %}
 <div class="auth-page">
     <div class="auth-card">
         <h1>🌿 植物查询管理系统</h1>
         <p class="subtitle">登录以使用完整功能</p>
+
+        <!-- 演示账号提示 -->
+        <div style="background:#f0f7f4;border-radius:8px;padding:0.75rem;margin-bottom:1.5rem;font-size:0.82rem;color:var(--primary-dark);">
+            <strong>💡 演示账号：</strong><br>
+            🔧 管理员：<code>admin</code> / <code>admin123</code><br>
+            👤 普通用户：<code>user</code> / <code>user123</code>
+        </div>
+
         <form method="post">
             {% csrf_token %}
             <div class="form-group">
@@ -24,7 +30,10 @@
                 <button type="submit" class="btn btn-primary">🔑 登 录</button>
             </div>
         </form>
-        <p class="alt-link">还没有账号？<a href="{% url 'register' %}">立即注册</a></p>
+        <p class="alt-link">
+            还没有账号？<a href="{% url 'register' %}">立即注册</a> &nbsp;|&nbsp;
+            <a href="{% url 'front_home' %}">返回首页</a>
+        </p>
     </div>
 </div>
 {% endblock %}

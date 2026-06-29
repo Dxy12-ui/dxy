@@ -720,3 +720,153 @@ tr:last-child td { border-bottom: none; }
     .search-box button { padding: 0.75rem 1.25rem; }
     .search-section { padding: 1.5rem 1rem; }
 }
+/* ===== 欢迎横幅 ===== */
+.welcome-banner {
+    background: linear-gradient(135deg, #1b4332, #2d6a4f, #40916c, #52b788);
+    border-radius: var(--radius);
+    padding: 3rem 2rem;
+    margin-bottom: 2rem;
+    text-align: center;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+}
+.welcome-banner::before {
+    content: "";
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+    animation: welcomePulse 6s ease-in-out infinite;
+}
+@keyframes welcomePulse {
+    0%, 100% { transform: scale(0.8); opacity: 0.5; }
+    50% { transform: scale(1.2); opacity: 0.3; }
+}
+.welcome-content { position: relative; z-index: 1; }
+.welcome-content h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.welcome-content p {
+    font-size: 1.05rem;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
+}
+.welcome-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.welcome-actions .btn {
+    padding: 0.7rem 1.8rem;
+    font-size: 1rem;
+    border-radius: 30px;
+    font-weight: 600;
+}
+.welcome-actions .btn-outline {
+    background: transparent;
+    border: 2px solid rgba(255,255,255,0.6);
+    color: #fff;
+}
+.welcome-actions .btn-outline:hover {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+    border-color: #fff;
+}
+
+/* ===== 管理员快捷栏 ===== */
+.admin-quick-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+    color: #fff;
+    font-weight: 500;
+}
+.admin-quick-bar .btn-outline {
+    border-color: rgba(255,255,255,0.5);
+    color: #fff;
+}
+.admin-quick-bar .btn-outline:hover {
+    background: rgba(255,255,255,0.2);
+    color: #fff;
+}
+.admin-quick-bar .btn-danger {
+    background: rgba(231,111,81,0.8);
+    margin-left: auto;
+}
+.admin-quick-bar .btn-danger:hover {
+    background: var(--danger);
+}
+
+/* ===== 登录页改进 ===== */
+.auth-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1b4332, #2d6a4f, #40916c, #52b788);
+    padding: 2rem;
+}
+.auth-card {
+    background: var(--bg-white);
+    border-radius: 16px;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.auth-card h1 {
+    text-align: center;
+    color: var(--primary-dark);
+    margin-bottom: 0.25rem;
+    font-size: 1.5rem;
+}
+.auth-card .subtitle {
+    text-align: center;
+    color: var(--text-light);
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+}
+.auth-card .form-actions {
+    margin-top: 1.5rem;
+}
+.auth-card .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem;
+    font-size: 1rem;
+}
+.auth-card .alt-link {
+    text-align: center;
+    margin-top: 1rem;
+    font-size: 0.85rem;
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 768px) {
+    .welcome-banner { padding: 2rem 1rem; }
+    .welcome-content h1 { font-size: 1.4rem; }
+    .welcome-actions .btn { width: 100%; }
+    .admin-quick-bar { justify-content: center; }
+    .admin-quick-bar .btn-danger { margin-left: 0; }
+    .main-content { padding: 1rem; }
+    .nav-container { height: auto; padding: 0.75rem 0; }
+    .plant-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .detail-header { flex-direction: column; }
+    .detail-img { width: 100%; height: 220px; }
+    .form-row { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .search-box input { padding: 0.75rem 1rem; }
+    .search-box button { padding: 0.75rem 1.25rem; }
+    .search-section { padding: 1.5rem 1rem; }
+}

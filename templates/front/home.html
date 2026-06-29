@@ -2,9 +2,47 @@
 {% block title %}首页 - 植物查询管理系统{% endblock %}
 {% block content %}
 
+<!-- 未登录欢迎横幅 -->
+{% if not user.is_authenticated %}
+<div class="welcome-banner">
+    <div class="welcome-content">
+        <h1>🌿 欢迎来到植物查询管理系统</h1>
+        <p>AI图片识图 · 文字精准搜索 · 海量植物科普</p>
+        <div class="welcome-actions">
+            <a href="{% url 'login' %}" class="btn btn-lg btn-primary">🔑 用户登录</a>
+            <a href="{% url 'register' %}" class="btn btn-lg" style="background:#fff;color:var(--primary);">📝 注册账号</a>
+            <a href="{% url 'login' %}" class="btn btn-lg btn-outline" style="border-color:rgba(255,255,255,0.6);color:#fff;">🔧 管理员登录</a>
+        </div>
+        <p style="font-size:0.8rem;opacity:0.7;margin-top:0.5rem;">提示：管理员账号 admin / admin123 &nbsp;|&nbsp; 普通用户 user / user123</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- 已登录用户快捷入口 -->
+{% if user.is_authenticated and user.role == "admin" %}
+<div class="admin-quick-bar">
+    <span>🔧 管理员快捷操作：</span>
+    <a href="{% url 'admin_dashboard' %}" class="btn btn-sm btn-primary">📊 进入后台</a>
+    <a href="{% url 'admin_plant_add' %}" class="btn btn-sm btn-success">➕ 新增植物</a>
+    <a href="{% url 'admin_plant_list' %}" class="btn btn-sm btn-outline">🌱 植物列表</a>
+    <a href="{% url 'admin_feedback_list' %}" class="btn btn-sm btn-outline">📝 审核反馈</a>
+    <a href="{% url 'logout' %}" class="btn btn-sm btn-danger">🚪 退出登录</a>
+</div>
+{% endif %}
+
+{% if user.is_authenticated and user.role == "user" %}
+<div class="admin-quick-bar" style="background:var(--accent-light);">
+    <span>👤 {{ user.username }}，欢迎回来！</span>
+    <a href="{% url 'plant_image_search' %}" class="btn btn-sm btn-primary">📷 图片识图</a>
+    <a href="{% url 'my_collections' %}" class="btn btn-sm btn-outline">⭐ 我的收藏</a>
+    <a href="{% url 'my_feedbacks' %}" class="btn btn-sm btn-outline">💬 我的反馈</a>
+    <a href="{% url 'logout' %}" class="btn btn-sm btn-danger">🚪 退出登录</a>
+</div>
+{% endif %}
+
 <!-- 搜索区域 -->
 <div class="search-section">
-    <h2>🌿 探索植物世界</h2>
+    <h2>🔍 探索植物世界</h2>
     <p>文字搜索、图片识别，快速查询植物信息</p>
     <div class="search-tabs">
         <span class="search-tab active" onclick="switchTab('text')">🔍 文字搜索</span>

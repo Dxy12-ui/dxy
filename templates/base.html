@@ -21,19 +21,27 @@
                     <a href="{% url 'admin_plant_list' %}" class="nav-link {% if '/manage/plants' in request.path %}active{% endif %}">🌱 植物管理</a>
                     <a href="{% url 'admin_category_list' %}" class="nav-link {% if '/manage/categories' in request.path %}active{% endif %}">📂 分类管理</a>
                     <a href="{% url 'admin_feedback_list' %}" class="nav-link {% if '/manage/feedbacks' in request.path %}active{% endif %}">📝 反馈审核</a>
-                    <a href="{% url 'admin_statistics' %}" class="nav-link {% if '/manage/statistics' in request.path %}active{% endif %}">📈 统计</a>
-                    <a href="{% url 'admin_operation_logs' %}" class="nav-link {% if '/manage/logs' in request.path %}active{% endif %}">📋 日志</a>
                     <a href="{% url 'admin_user_list' %}" class="nav-link {% if '/manage/users' in request.path %}active{% endif %}">👥 用户</a>
+                    <a href="{% url 'admin_statistics' %}" class="nav-link {% if '/manage/statistics' in request.path %}active{% endif %}">📈 统计</a>
                 {% else %}
                     <a href="{% url 'front_home' %}" class="nav-link {% if request.path == '/' %}active{% endif %}">🏠 首页</a>
-                    <a href="{% url 'plant_image_search' %}" class="nav-link {% if '/image-search' in request.path %}active{% endif %}">📷 图片识图</a>
-                    <a href="{% url 'my_collections' %}" class="nav-link {% if '/my-collections' in request.path %}active{% endif %}">⭐ 我的收藏</a>
-                    <a href="{% url 'my_history' %}" class="nav-link {% if '/my-history' in request.path %}active{% endif %}">🕐 查询历史</a>
-                    <a href="{% url 'my_feedbacks' %}" class="nav-link {% if '/my-feedbacks' in request.path %}active{% endif %}">💬 我的反馈</a>
+                    <a href="{% url 'plant_image_search' %}" class="nav-link">📷 图片识图</a>
+                    <a href="{% url 'my_collections' %}" class="nav-link">⭐ 我的收藏</a>
+                    <a href="{% url 'my_history' %}" class="nav-link">🕐 历史</a>
+                    <a href="{% url 'my_feedbacks' %}" class="nav-link">💬 反馈</a>
                 {% endif %}
-                <span class="nav-user">{{ user.username }}</span>
-                <a href="{% url 'profile' %}" class="nav-link">⚙️ 个人信息</a>
+                <span class="nav-user">
+                    {% if user.role == 'admin' %}🔧{% else %}👤{% endif %} {{ user.username }}
+                </span>
+                <a href="{% url 'profile' %}" class="nav-link">⚙️</a>
                 <a href="{% url 'logout' %}" class="nav-link nav-logout">🚪 退出</a>
+            </div>
+            {% else %}
+            <div class="nav-links">
+                <a href="{% url 'front_home' %}" class="nav-link active">🏠 首页</a>
+                <a href="{% url 'plant_search' %}" class="nav-link">🔍 搜索植物</a>
+                <a href="{% url 'login' %}" class="nav-link">🔑 登录</a>
+                <a href="{% url 'register' %}" class="nav-link" style="background:rgba(255,255,255,0.3);">📝 注册</a>
             </div>
             {% endif %}
         </div>
