@@ -4,6 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncMonth
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.utils import timezone
@@ -148,11 +149,15 @@ def admin_dashboard(request):
     six_months_ago = timezone.now() - timedelta(days=180)
     monthly_data = (
         BorrowRecord.objects.filter(borrow_date__gte=six_months_ago)
-        .extra(select={"month": "strftime('%%Y-%%m', borrow_date)"})
+        .annotate(month=TruncMonth("borrow_date"))
         .values("month")
         .annotate(count=Count("id"))
         .order_by("month")
     )
+    monthly_data = [
+        {"month": item["month"].strftime("%Y-%m"), "count": item["count"]}
+        for item in monthly_data
+    ]
     
     context = {
         "total_books": total_books,
@@ -376,11 +381,15 @@ def admin_statistics(request):
     six_months_ago = timezone.now() - timedelta(days=180)
     monthly_data = (
         BorrowRecord.objects.filter(borrow_date__gte=six_months_ago)
-        .extra(select={"month": "strftime('%%Y-%%m', borrow_date)"})
+        .annotate(month=TruncMonth("borrow_date"))
         .values("month")
         .annotate(count=Count("id"))
         .order_by("month")
     )
+    monthly_data = [
+        {"month": item["month"].strftime("%Y-%m"), "count": item["count"]}
+        for item in monthly_data
+    ]
     
     monthly_labels = [item["month"] for item in monthly_data]
     monthly_counts = [item["count"] for item in monthly_data]
@@ -413,4 +422,5 @@ def admin_user_list(request):
     page_obj = paginator.get_page(page_number)
     
     return render(request, "admin/user_list.html", {"page_obj": page_obj})
+
 

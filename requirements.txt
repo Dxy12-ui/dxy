@@ -1,0 +1,6 @@
+﻿# Django 校园图书管理系统 - Railway 部署依赖
+Django==4.2
+mysqlclient==2.2.8
+whitenoise==6.7.0
+gunicorn==22.0.0
+dj-database-url==2.3.0
