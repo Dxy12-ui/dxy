@@ -8,10 +8,11 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-plant-system-2024-sec
 DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
-# Railway 自动注入 PUBLIC_DOMAIN
 railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
 if railway_domain and railway_domain not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(railway_domain)
+# Railway 内部健康检查用
+ALLOWED_HOSTS.append(".railway.app")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -56,7 +57,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "library_system.wsgi.application"
 
-# ===== 数据库（Railway 自动注入 DATABASE_URL -> PostgreSQL）=====
+# ===== 数据库 =====
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL:
     import dj_database_url
@@ -68,7 +69,6 @@ if DATABASE_URL:
         )
     }
 else:
-    # 本地开发使用 SQLite
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -85,7 +85,7 @@ TIME_ZONE = "Asia/Shanghai"
 USE_I18N = True
 USE_TZ = True
 
-# ===== 静态文件（Whitenoise）=====
+# ===== 静态文件 =====
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -112,12 +112,16 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 
 # ===== 生产环境安全 =====
 if not DEBUG:
+    # Railway 在反向代理层处理 HTTPS，Django 不需要重定向
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = False
+
     CSRF_TRUSTED_ORIGINS = [
         o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o
     ]
     if railway_domain:
         CSRF_TRUSTED_ORIGINS.append(f"https://{railway_domain}")
-    SECURE_SSL_REDIRECT = True
+
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
